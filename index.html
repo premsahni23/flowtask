@@ -107,6 +107,7 @@
   margin-bottom: 28px;
   box-shadow: 0 8px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05);
   transition: border-color 0.2s, box-shadow 0.2s;
+  flex-wrap: wrap;
 }
 
 .ft-input-bar.focused {
@@ -123,6 +124,7 @@
   flex: 1; background: none; border: none; outline: none;
   font-family: 'Plus Jakarta Sans', sans-serif;
   font-size: 14px; color: #e2e8f0; caret-color: #8b5cf6;
+  min-width: 0;
 }
 
 .ft-input::placeholder { color: #475569; }
@@ -171,7 +173,157 @@
 
 .ft-columns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
 
-@media (max-width: 768px) { .ft-columns { grid-template-columns: 1fr; } }
+/* ═══════════════════════════════════════════════
+   RESPONSIVE — TABLET  (≤ 900px)
+═══════════════════════════════════════════════ */
+@media (max-width: 900px) {
+  .ft-stats { display: none; }
+}
+
+/* ═══════════════════════════════════════════════
+   RESPONSIVE — MOBILE  (≤ 768px)
+═══════════════════════════════════════════════ */
+@media (max-width: 768px) {
+
+  /* Wrap */
+  .ft-wrap { padding: 0 14px 80px; }
+
+  /* ── Header ── */
+  .ft-header {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 14px 0 16px;
+  }
+
+  .ft-header-right {
+    width: 100%;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .ft-logo-name { font-size: 17px; }
+  .ft-logo-icon { width: 30px; height: 30px; font-size: 15px; }
+
+  /* Hide stats bar on mobile — shown in insights panel instead */
+  .ft-stats { display: none; }
+
+  /* AI badge — keep but shrink */
+  .ft-ai-badge { font-size: 11px; padding: 4px 10px; }
+
+  /* User name hidden on very small screens, avatar stays */
+  .ft-user-name { display: none; }
+  .ft-user-profile { padding: 4px 8px 4px 4px; }
+
+  .ft-logout-btn { font-size: 10px; padding: 4px 8px; }
+
+  /* ── Input bar ── */
+  .ft-input-bar {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    top: 8px;
+    margin-bottom: 16px;
+  }
+
+  /* Input takes full width on its own row */
+  .ft-input {
+    width: 100%;
+    font-size: 15px; /* prevent iOS zoom on focus */
+    min-width: 0;
+  }
+
+  /* Voice + Add button sit on second row */
+  .ft-voice-btn {
+    flex-shrink: 0;
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    font-size: 17px;
+  }
+
+  .ft-add-btn {
+    flex: 1;
+    justify-content: center;
+    padding: 10px 12px;
+    font-size: 13px;
+    border-radius: 10px;
+  }
+
+  /* ── Hint chips — hide on mobile, they take too much space ── */
+  .ft-hint { display: none; }
+
+  /* ── Insights panel ── */
+  .ft-insights {
+    gap: 12px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    border-radius: 14px;
+  }
+
+  .ft-insight-val { font-size: 20px; }
+  .ft-insight-label { font-size: 10px; }
+  .ft-insight-divider { height: 24px; }
+
+  .ft-insight-ai {
+    width: 100%;
+    min-width: unset;
+    padding-left: 0;
+    padding-top: 4px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+    font-size: 11px;
+  }
+
+  /* ── Kanban columns — stack vertically ── */
+  .ft-columns {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .ft-col {
+    min-height: unset;
+    border-radius: 14px;
+  }
+
+  .ft-col-body { min-height: 80px; }
+
+  /* ── Cards — always show delete button on mobile (no hover) ── */
+  .ft-card-actions { opacity: 1; }
+
+  .ft-card-btn {
+    width: 28px; height: 28px;
+    font-size: 13px;
+    border-radius: 7px;
+  }
+
+  /* ── Auth card ── */
+  .ft-auth-card {
+    padding: 36px 24px;
+    border-radius: 20px;
+  }
+
+  .ft-auth-title { font-size: 24px; }
+  .ft-auth-sub { font-size: 13px; margin-bottom: 24px; }
+  .ft-auth-logo { width: 48px; height: 48px; font-size: 24px; }
+
+  /* ── Toast — full width at bottom ── */
+  .ft-toast {
+    left: 14px;
+    right: 14px;
+    bottom: 16px;
+    max-width: unset;
+    font-size: 12px;
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   RESPONSIVE — SMALL MOBILE  (≤ 380px)
+═══════════════════════════════════════════════ */
+@media (max-width: 380px) {
+  .ft-wrap { padding: 0 10px 80px; }
+  .ft-ai-badge { display: none; }
+  .ft-auth-card { padding: 28px 18px; }
+  .ft-add-btn span:first-child { display: none; } /* hide "+" text, keep "Add Task" */
+}
 
 .ft-col {
   border-radius: 18px;
