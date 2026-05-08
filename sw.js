@@ -1,78 +1,108 @@
 /**
- * FlowTask Service Worker
- * Strategy: Cache-first for static assets, network-first for API calls.
+ * FlowTask Service Worker v2
+ *
+ * Strategy:
+ *  - App shell (HTML, manifest, icons) → Cache-first, fallback to network
+ *  - Firebase / API / external CDN     → Network-only (never cached)
+ *  - Everything else same-origin       → Network-first, cache as fallback
+ *
+ * Bump CACHE_VERSION whenever you deploy a new build so old caches are purged.
  */
 
-const CACHE_NAME = 'flowtask-v1';
+const CACHE_VERSION = 'flowtask-v2';
 
-// Static assets to pre-cache on install
-const PRECACHE_URLS = [
+// App shell — pre-cached on install so the app loads offline
+const PRECACHE = [
   '/',
   '/index.html',
   '/manifest.json',
-  'https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap'
+  '/icons/icon-192.png',
+  '/icons/icon-512.png'
 ];
 
-// ── Install: pre-cache static shell ──────────────────────────────────────────
+/* ── INSTALL ─────────────────────────────────────────────────────────────── */
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(PRECACHE_URLS).catch(err => {
-        // Non-fatal: fonts may fail in some environments
-        console.warn('[SW] Pre-cache partial failure:', err);
-      });
-    }).then(() => self.skipWaiting())
+    caches.open(CACHE_VERSION)
+      .then(cache => cache.addAll(PRECACHE))
+      .then(() => self.skipWaiting()) // activate immediately, don't wait for old SW to die
+      .catch(err => console.warn('[SW] Pre-cache failed (non-fatal):', err))
   );
 });
 
-// ── Activate: clean up old caches ────────────────────────────────────────────
+/* ── ACTIVATE ────────────────────────────────────────────────────────────── */
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(
+    caches.keys()
+      .then(keys => Promise.all(
         keys
-          .filter(key => key !== CACHE_NAME)
+          .filter(key => key !== CACHE_VERSION) // delete all old cache versions
           .map(key => caches.delete(key))
-      )
-    ).then(() => self.clients.claim())
+      ))
+      .then(() => self.clients.claim()) // take control of all open tabs immediately
   );
 });
 
-// ── Fetch: routing strategy ───────────────────────────────────────────────────
+/* ── FETCH ───────────────────────────────────────────────────────────────── */
 self.addEventListener('fetch', event => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Never intercept Firebase, API calls, or non-GET requests
+  // ── Never intercept: non-GET, Firebase, Anthropic API, external CDNs ──
   if (
-    request.method !== 'GET' ||
-    url.pathname.startsWith('/api/') ||
-    url.hostname.includes('firebaseio.com') ||
-    url.hostname.includes('googleapis.com') ||
-    url.hostname.includes('gstatic.com')
+    request.method !== 'GET'                          ||
+    url.pathname.startsWith('/api/')                  ||
+    url.hostname.includes('firebaseio.com')           ||
+    url.hostname.includes('firestore.googleapis.com') ||
+    url.hostname.includes('identitytoolkit.googleapis.com') ||
+    url.hostname.includes('securetoken.googleapis.com') ||
+    url.hostname.includes('googleapis.com')           ||
+    url.hostname.includes('gstatic.com')              ||
+    url.hostname.includes('anthropic.com')
   ) {
-    return; // fall through to network
+    return; // let the browser handle it normally
   }
 
-  // Cache-first for same-origin static assets
-  event.respondWith(
-    caches.match(request).then(cached => {
-      if (cached) return cached;
+  // ── App shell (navigation requests) → Cache-first ──
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      caches.match('/index.html')
+        .then(cached => cached || fetch(request))
+        .catch(() => caches.match('/index.html'))
+    );
+    return;
+  }
 
-      return fetch(request).then(response => {
-        // Only cache valid responses
-        if (!response || response.status !== 200 || response.type === 'opaque') {
+  // ── Static assets (icons, manifest) → Cache-first ──
+  if (
+    url.pathname.startsWith('/icons/') ||
+    url.pathname === '/manifest.json'
+  ) {
+    event.respondWith(
+      caches.match(request).then(cached => {
+        if (cached) return cached;
+        return fetch(request).then(response => {
+          if (response && response.status === 200) {
+            const clone = response.clone();
+            caches.open(CACHE_VERSION).then(c => c.put(request, clone));
+          }
           return response;
+        });
+      })
+    );
+    return;
+  }
+
+  // ── Everything else same-origin → Network-first, cache as fallback ──
+  event.respondWith(
+    fetch(request)
+      .then(response => {
+        if (response && response.status === 200 && response.type !== 'opaque') {
+          const clone = response.clone();
+          caches.open(CACHE_VERSION).then(c => c.put(request, clone));
         }
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
         return response;
-      }).catch(() => {
-        // Offline fallback: return cached index.html for navigation requests
-        if (request.mode === 'navigate') {
-          return caches.match('/index.html');
-        }
-      });
-    })
+      })
+      .catch(() => caches.match(request))
   );
 });
