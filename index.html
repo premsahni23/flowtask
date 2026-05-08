@@ -5,9 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FlowTask — AI Kanban</title>
   <meta name="description" content="AI-powered Kanban productivity tool" />
-  <meta name="theme-color" content="#080b14" />
+
+  <!-- PWA theme colour — must match manifest.json theme_color -->
+  <meta name="theme-color" content="#8b5cf6" />
+
+  <!-- Manifest — served as application/manifest+json via vercel.json headers -->
   <link rel="manifest" href="/manifest.json" />
+
+  <!-- iOS PWA support -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="FlowTask" />
   <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+
+  <!-- Android / Windows tile -->
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="application-name" content="FlowTask" />
 </head>
 <body>
 <style>
@@ -985,11 +998,25 @@
 
   /* ─────────────────────────────────────────────
      PWA — SERVICE WORKER REGISTRATION
+     Registered early so it can intercept fetches
+     on the very first page load after install.
   ───────────────────────────────────────────── */
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js')
-        .then(reg => console.log('[SW] Registered, scope:', reg.scope))
+      navigator.serviceWorker.register('/sw.js', { scope: '/' })
+        .then(reg => {
+          console.log('[SW] Registered ✓  scope:', reg.scope);
+          // When a new SW is found, activate it immediately
+          reg.addEventListener('updatefound', () => {
+            const newSW = reg.installing;
+            newSW.addEventListener('statechange', () => {
+              if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+                console.log('[SW] New version available — reloading');
+                window.location.reload();
+              }
+            });
+          });
+        })
         .catch(err => console.warn('[SW] Registration failed:', err));
     });
   }

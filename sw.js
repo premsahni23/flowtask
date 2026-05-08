@@ -1,18 +1,12 @@
-/**
- * FlowTask Service Worker v2
- *
- * Strategy:
- *  - App shell (HTML, manifest, icons) → Cache-first, fallback to network
- *  - Firebase / API / external CDN     → Network-only (never cached)
- *  - Everything else same-origin       → Network-first, cache as fallback
- *
- * Bump CACHE_VERSION whenever you deploy a new build so old caches are purged.
- */
+/* ============================================================
+   FlowTask Service Worker  —  v3
+   Cache-first for app shell, network-only for Firebase/API.
+   Bump the version string on every deploy to bust old caches.
+   ============================================================ */
 
-const CACHE_VERSION = 'flowtask-v2';
+const CACHE = 'flowtask-v3';
 
-// App shell — pre-cached on install so the app loads offline
-const PRECACHE = [
+const SHELL = [
   '/',
   '/index.html',
   '/manifest.json',
@@ -20,89 +14,69 @@ const PRECACHE = [
   '/icons/icon-512.png'
 ];
 
-/* ── INSTALL ─────────────────────────────────────────────────────────────── */
+/* ── INSTALL: pre-cache the app shell ─────────────────────── */
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_VERSION)
-      .then(cache => cache.addAll(PRECACHE))
-      .then(() => self.skipWaiting()) // activate immediately, don't wait for old SW to die
-      .catch(err => console.warn('[SW] Pre-cache failed (non-fatal):', err))
+    caches.open(CACHE)
+      .then(cache => cache.addAll(SHELL))
+      .then(() => self.skipWaiting())
   );
 });
 
-/* ── ACTIVATE ────────────────────────────────────────────────────────────── */
+/* ── ACTIVATE: delete every old cache version ─────────────── */
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
       .then(keys => Promise.all(
-        keys
-          .filter(key => key !== CACHE_VERSION) // delete all old cache versions
-          .map(key => caches.delete(key))
+        keys.filter(k => k !== CACHE).map(k => caches.delete(k))
       ))
-      .then(() => self.clients.claim()) // take control of all open tabs immediately
+      .then(() => self.clients.claim())
   );
 });
 
-/* ── FETCH ───────────────────────────────────────────────────────────────── */
+/* ── FETCH: serve from cache, fall back to network ─────────── */
 self.addEventListener('fetch', event => {
-  const { request } = event;
-  const url = new URL(request.url);
+  const url = new URL(event.request.url);
 
-  // ── Never intercept: non-GET, Firebase, Anthropic API, external CDNs ──
+  /* Pass through — never cache these */
   if (
-    request.method !== 'GET'                          ||
-    url.pathname.startsWith('/api/')                  ||
-    url.hostname.includes('firebaseio.com')           ||
-    url.hostname.includes('firestore.googleapis.com') ||
+    event.request.method !== 'GET'                          ||
+    url.pathname.startsWith('/api/')                        ||
+    url.hostname.includes('firebaseio.com')                 ||
+    url.hostname.includes('firestore.googleapis.com')       ||
     url.hostname.includes('identitytoolkit.googleapis.com') ||
-    url.hostname.includes('securetoken.googleapis.com') ||
-    url.hostname.includes('googleapis.com')           ||
-    url.hostname.includes('gstatic.com')              ||
-    url.hostname.includes('anthropic.com')
+    url.hostname.includes('securetoken.googleapis.com')     ||
+    url.hostname.includes('googleapis.com')                 ||
+    url.hostname.includes('gstatic.com')
   ) {
-    return; // let the browser handle it normally
+    return;
   }
 
-  // ── App shell (navigation requests) → Cache-first ──
-  if (request.mode === 'navigate') {
+  /* Navigation requests → always serve index.html from cache */
+  if (event.request.mode === 'navigate') {
     event.respondWith(
-      caches.match('/index.html')
-        .then(cached => cached || fetch(request))
-        .catch(() => caches.match('/index.html'))
+      caches.match('/index.html').then(r => r || fetch(event.request))
     );
     return;
   }
 
-  // ── Static assets (icons, manifest) → Cache-first ──
-  if (
-    url.pathname.startsWith('/icons/') ||
-    url.pathname === '/manifest.json'
-  ) {
-    event.respondWith(
-      caches.match(request).then(cached => {
-        if (cached) return cached;
-        return fetch(request).then(response => {
-          if (response && response.status === 200) {
-            const clone = response.clone();
-            caches.open(CACHE_VERSION).then(c => c.put(request, clone));
-          }
-          return response;
-        });
-      })
-    );
-    return;
-  }
-
-  // ── Everything else same-origin → Network-first, cache as fallback ──
+  /* Everything else → cache-first, populate cache on miss */
   event.respondWith(
-    fetch(request)
-      .then(response => {
+    caches.match(event.request).then(cached => {
+      if (cached) return cached;
+
+      return fetch(event.request).then(response => {
         if (response && response.status === 200 && response.type !== 'opaque') {
           const clone = response.clone();
-          caches.open(CACHE_VERSION).then(c => c.put(request, clone));
+          caches.open(CACHE).then(c => c.put(event.request, clone));
         }
         return response;
-      })
-      .catch(() => caches.match(request))
+      }).catch(() => {
+        /* Offline fallback for navigation */
+        if (event.request.mode === 'navigate') {
+          return caches.match('/index.html');
+        }
+      });
+    })
   );
 });
