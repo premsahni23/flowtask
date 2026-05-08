@@ -1,0 +1,16 @@
+{
+  "name": "flowtask",
+  "version": "2.0.0",
+  "description": "AI-powered Kanban SaaS with Firebase auth and real-time sync",
+  "type": "module",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "devDependencies": {
+    "vercel": "latest"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

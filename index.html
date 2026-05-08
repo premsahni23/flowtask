@@ -1,0 +1,1179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FlowTask — AI Kanban</title>
+  <meta name="description" content="AI-powered Kanban productivity tool" />
+  <meta name="theme-color" content="#080b14" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+</head>
+<body>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+.ft-root {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  background: #080b14;
+  min-height: 100vh;
+  color: #e2e8f0;
+  position: relative;
+  overflow: hidden;
+}
+
+.ft-bg {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 50% at 10% 20%, rgba(99,51,255,0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 60% at 90% 80%, rgba(16,185,129,0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 40% at 50% 50%, rgba(245,158,11,0.04) 0%, transparent 70%),
+    #080b14;
+}
+
+.ft-grid-overlay {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.ft-wrap { position: relative; z-index: 1; padding: 0 20px 40px; max-width: 1200px; margin: 0 auto; }
+
+.ft-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 0 28px;
+}
+
+.ft-logo {
+  display: flex; align-items: center; gap: 10px;
+}
+
+.ft-logo-icon {
+  width: 36px; height: 36px; border-radius: 10px;
+  background: linear-gradient(135deg, #6333ff, #8b5cf6);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; box-shadow: 0 0 20px rgba(99,51,255,0.4);
+}
+
+.ft-logo-name {
+  font-family: 'Syne', sans-serif;
+  font-size: 20px; font-weight: 800; letter-spacing: -0.5px;
+  background: linear-gradient(135deg, #e2e8f0, #94a3b8);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+
+.ft-header-right { display: flex; align-items: center; gap: 10px; }
+
+.ft-ai-badge {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(99,51,255,0.15); border: 1px solid rgba(99,51,255,0.3);
+  border-radius: 20px; padding: 5px 12px; font-size: 12px; font-weight: 500;
+  color: #a78bfa;
+}
+
+.ft-ai-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #6333ff;
+  box-shadow: 0 0 8px #6333ff;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.7); }
+}
+
+.ft-stats { display: flex; gap: 6px; }
+
+.ft-stat {
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 8px; padding: 4px 10px; font-size: 11px;
+  color: #64748b; display: flex; align-items: center; gap: 4px;
+}
+
+.ft-stat-num { color: #94a3b8; font-weight: 600; }
+
+.ft-input-bar {
+  position: sticky; top: 12px; z-index: 50;
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(15,20,35,0.85);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px; padding: 10px 12px 10px 16px;
+  margin-bottom: 28px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.ft-input-bar.focused {
+  border-color: rgba(99,51,255,0.4);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.4), 0 0 0 3px rgba(99,51,255,0.1), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+.ft-input-bar.processing {
+  border-color: rgba(99,51,255,0.5);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.4), 0 0 20px rgba(99,51,255,0.2), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+.ft-input {
+  flex: 1; background: none; border: none; outline: none;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 14px; color: #e2e8f0; caret-color: #8b5cf6;
+}
+
+.ft-input::placeholder { color: #475569; }
+
+.ft-ai-typing {
+  display: flex; align-items: center; gap: 3px; padding: 0 8px;
+}
+
+.ft-typing-dot {
+  width: 4px; height: 4px; border-radius: 50%; background: #8b5cf6;
+  animation: typing 1.2s ease-in-out infinite;
+}
+
+.ft-typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.ft-typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes typing {
+  0%, 100% { transform: translateY(0); opacity: 0.4; }
+  50% { transform: translateY(-4px); opacity: 1; }
+}
+
+.ft-add-btn {
+  display: flex; align-items: center; gap: 6px;
+  background: linear-gradient(135deg, #6333ff, #8b5cf6);
+  border: none; border-radius: 10px; padding: 8px 16px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 13px; font-weight: 600; color: #fff; cursor: pointer;
+  transition: all 0.2s; white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(99,51,255,0.3);
+}
+
+.ft-add-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(99,51,255,0.45); }
+.ft-add-btn:active { transform: translateY(0); }
+.ft-add-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.ft-hint {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: #334155; margin-bottom: 24px; padding: 0 4px;
+}
+
+.ft-hint-chip {
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 4px; padding: 2px 6px; font-size: 10px; color: #475569;
+  font-family: 'Plus Jakarta Sans', monospace;
+}
+
+.ft-columns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+
+@media (max-width: 768px) { .ft-columns { grid-template-columns: 1fr; } }
+
+.ft-col {
+  border-radius: 18px;
+  background: rgba(255,255,255,0.025);
+  border: 1px solid rgba(255,255,255,0.06);
+  backdrop-filter: blur(10px);
+  overflow: hidden;
+  transition: border-color 0.3s;
+  min-height: 400px;
+}
+
+.ft-col.drag-over { border-color: rgba(99,51,255,0.5); background: rgba(99,51,255,0.05); }
+
+.ft-col-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 18px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.ft-col-title {
+  display: flex; align-items: center; gap: 8px;
+  font-family: 'Syne', sans-serif;
+  font-size: 13px; font-weight: 700; letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.ft-col-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+}
+
+.ft-col-count {
+  font-size: 11px; font-weight: 700;
+  border-radius: 6px; padding: 2px 7px;
+  font-family: 'Syne', sans-serif;
+}
+
+.col-todo .ft-col-dot { background: #6366f1; box-shadow: 0 0 8px #6366f1; }
+.col-todo .ft-col-title { color: #818cf8; }
+.col-todo .ft-col-count { background: rgba(99,102,241,0.15); color: #818cf8; }
+.col-todo { border-top: 2px solid rgba(99,102,241,0.4); }
+
+.col-inprogress .ft-col-dot { background: #f59e0b; box-shadow: 0 0 8px #f59e0b; }
+.col-inprogress .ft-col-title { color: #fbbf24; }
+.col-inprogress .ft-col-count { background: rgba(245,158,11,0.15); color: #fbbf24; }
+.col-inprogress { border-top: 2px solid rgba(245,158,11,0.4); }
+
+.col-completed .ft-col-dot { background: #10b981; box-shadow: 0 0 8px #10b981; }
+.col-completed .ft-col-title { color: #34d399; }
+.col-completed .ft-col-count { background: rgba(16,185,129,0.15); color: #34d399; }
+.col-completed { border-top: 2px solid rgba(16,185,129,0.4); }
+
+.ft-col-body { padding: 12px; display: flex; flex-direction: column; gap: 8px; min-height: 300px; }
+
+.ft-empty {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 10px; padding: 40px 20px;
+  opacity: 0.5;
+}
+
+.ft-empty-icon { font-size: 32px; }
+.ft-empty-msg { font-size: 12px; color: #475569; text-align: center; line-height: 1.5; }
+
+.ft-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px; padding: 12px 14px;
+  cursor: grab; position: relative; overflow: hidden;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: card-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(-10px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.ft-card::before {
+  content: ''; position: absolute; inset: 0; border-radius: 12px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.ft-card:hover {
+  transform: translateY(-3px) scale(1.01);
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.14);
+  box-shadow: 0 12px 30px rgba(0,0,0,0.4);
+}
+
+.ft-card:active { cursor: grabbing; transform: scale(0.98) rotate(1deg); }
+
+.ft-card.dragging { opacity: 0.4; transform: scale(0.95); }
+
+.ft-card-bar {
+  position: absolute; top: 0; left: 0; right: 0; height: 2px; border-radius: 12px 12px 0 0;
+}
+
+.col-todo .ft-card-bar { background: linear-gradient(90deg, #6366f1, #8b5cf6); }
+.col-inprogress .ft-card-bar { background: linear-gradient(90deg, #f59e0b, #ef4444); }
+.col-completed .ft-card-bar { background: linear-gradient(90deg, #10b981, #34d399); }
+
+.ft-card-text {
+  font-size: 13px; color: #cbd5e1; line-height: 1.5; margin-top: 4px;
+  font-weight: 400;
+}
+
+.ft-card-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 10px;
+}
+
+.ft-card-time {
+  font-size: 10px; color: #334155;
+  display: flex; align-items: center; gap: 4px;
+}
+
+.ft-card-actions { display: flex; gap: 4px; opacity: 0; transition: opacity 0.15s; }
+.ft-card:hover .ft-card-actions { opacity: 1; }
+
+.ft-card-btn {
+  width: 22px; height: 22px; border-radius: 6px; border: none;
+  background: rgba(255,255,255,0.06); color: #64748b; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; font-size: 11px;
+  transition: all 0.15s;
+}
+
+.ft-card-btn:hover { background: rgba(239,68,68,0.2); color: #f87171; }
+
+.ft-col-stripe {
+  position: absolute; top: 0; right: 0; width: 1px; height: 100%;
+  pointer-events: none;
+}
+
+.ft-error {
+  font-size: 11px; color: #f87171; padding: 6px 12px;
+  background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2);
+  border-radius: 8px; margin-bottom: 12px; text-align: center;
+}
+
+/* ── Auth overlay ── */
+.ft-auth-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(8,11,20,0.97);
+  backdrop-filter: blur(20px);
+  display: flex; align-items: center; justify-content: center;
+  animation: fade-in 0.4s ease;
+}
+
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slide-up { from { opacity: 0; transform: translateY(24px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+.ft-auth-card {
+  background: rgba(15,20,35,0.9);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 24px; padding: 48px 40px;
+  max-width: 420px; width: 90%;
+  text-align: center;
+  box-shadow: 0 40px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(99,51,255,0.1);
+  animation: slide-up 0.4s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+.ft-auth-logo {
+  width: 56px; height: 56px; border-radius: 16px;
+  background: linear-gradient(135deg, #6333ff, #8b5cf6);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; margin: 0 auto 20px;
+  box-shadow: 0 0 40px rgba(99,51,255,0.5);
+}
+
+.ft-auth-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 28px; font-weight: 800; letter-spacing: -0.5px;
+  background: linear-gradient(135deg, #e2e8f0, #94a3b8);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  margin-bottom: 8px;
+}
+
+.ft-auth-sub {
+  font-size: 14px; color: #475569; margin-bottom: 32px; line-height: 1.6;
+}
+
+.ft-google-btn {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%; padding: 14px 20px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px; cursor: pointer;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 14px; font-weight: 600; color: #e2e8f0;
+  transition: all 0.2s;
+}
+
+.ft-google-btn:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.2);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+}
+
+.ft-google-btn svg { flex-shrink: 0; }
+
+.ft-auth-footer {
+  margin-top: 24px; font-size: 11px; color: #334155; line-height: 1.6;
+}
+
+/* ── User profile in header ── */
+.ft-user-profile {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 24px; padding: 5px 12px 5px 5px;
+  cursor: pointer; transition: all 0.2s;
+}
+
+.ft-user-profile:hover { background: rgba(255,255,255,0.08); }
+
+.ft-user-avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  object-fit: cover; border: 1px solid rgba(255,255,255,0.1);
+}
+
+.ft-user-avatar-placeholder {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: linear-gradient(135deg, #6333ff, #8b5cf6);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; color: #fff;
+}
+
+.ft-user-name {
+  font-size: 12px; font-weight: 600; color: #94a3b8; max-width: 100px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.ft-logout-btn {
+  background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2);
+  border-radius: 8px; padding: 5px 10px; font-size: 11px; font-weight: 600;
+  color: #f87171; cursor: pointer; transition: all 0.2s;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+.ft-logout-btn:hover { background: rgba(239,68,68,0.2); }
+
+/* ── Voice button ── */
+.ft-voice-btn {
+  width: 34px; height: 34px; border-radius: 10px; border: none;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: #64748b; cursor: pointer; font-size: 15px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s; flex-shrink: 0;
+}
+
+.ft-voice-btn:hover { background: rgba(99,51,255,0.15); color: #a78bfa; border-color: rgba(99,51,255,0.3); }
+.ft-voice-btn.listening { background: rgba(239,68,68,0.15); color: #f87171; border-color: rgba(239,68,68,0.3); animation: pulse-ring 1s ease-in-out infinite; }
+
+@keyframes pulse-ring {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.3); }
+  50% { box-shadow: 0 0 0 6px rgba(239,68,68,0); }
+}
+
+/* ── Insights panel ── */
+.ft-insights {
+  background: rgba(15,20,35,0.6);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 16px; padding: 16px 20px;
+  margin-bottom: 24px;
+  display: flex; align-items: center; gap: 20px;
+  flex-wrap: wrap;
+}
+
+.ft-insight-item {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: #64748b;
+}
+
+.ft-insight-val {
+  font-family: 'Syne', sans-serif;
+  font-size: 18px; font-weight: 800; color: #e2e8f0;
+}
+
+.ft-insight-label { font-size: 11px; color: #475569; }
+
+.ft-insight-divider {
+  width: 1px; height: 32px; background: rgba(255,255,255,0.06);
+}
+
+.ft-insight-ai {
+  flex: 1; min-width: 200px;
+  font-size: 12px; color: #64748b; line-height: 1.5;
+  padding-left: 4px;
+}
+
+.ft-insight-ai strong { color: #a78bfa; font-weight: 600; }
+
+/* ── Loading skeleton ── */
+.ft-loading {
+  display: flex; flex-direction: column; gap: 8px; padding: 12px;
+}
+
+.ft-skeleton {
+  height: 64px; border-radius: 12px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.03) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+/* ── Toast ── */
+.ft-toast {
+  position: fixed; bottom: 24px; right: 24px; z-index: 300;
+  background: rgba(15,20,35,0.95);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px; padding: 12px 16px;
+  font-size: 13px; color: #e2e8f0;
+  display: flex; align-items: center; gap: 8px;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.5);
+  animation: toast-in 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  max-width: 300px;
+}
+
+@keyframes toast-in { from { opacity: 0; transform: translateY(12px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes toast-out { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(8px); } }
+
+.ft-toast-icon { font-size: 16px; flex-shrink: 0; }
+
+/* ── Card delete button fix ── */
+.ft-card-btn {
+  width: 22px; height: 22px; border-radius: 6px; border: none;
+  background: rgba(255,255,255,0.06); color: #64748b; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; font-size: 11px;
+  transition: all 0.15s;
+}
+
+.ft-card-btn:hover { background: rgba(239,68,68,0.2); color: #f87171; }
+
+/* ── Stat update animation ── */
+@keyframes stat-pop { 0%,100% { transform: scale(1); } 50% { transform: scale(1.3); color: #a78bfa; } }
+.stat-pop { animation: stat-pop 0.3s ease; }
+</style>
+
+<!-- ── Auth overlay (shown until user signs in) ── -->
+<div class="ft-auth-overlay" id="auth-overlay">
+  <div class="ft-auth-card">
+    <div class="ft-auth-logo">⚡</div>
+    <div class="ft-auth-title">FlowTask</div>
+    <p class="ft-auth-sub">Your AI-powered Kanban workspace.<br>Sign in to sync tasks across all devices.</p>
+    <button class="ft-google-btn" id="google-signin-btn">
+      <!-- Google G logo -->
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+        <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
+        <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
+        <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+      </svg>
+      Continue with Google
+    </button>
+    <p class="ft-auth-footer">By signing in you agree to our Terms of Service.<br>Your tasks are private and encrypted.</p>
+  </div>
+</div>
+
+<div class="ft-root">
+  <div class="ft-bg"></div>
+  <div class="ft-grid-overlay"></div>
+  <div class="ft-wrap">
+
+    <!-- ── Header ── -->
+    <header class="ft-header">
+      <div class="ft-logo">
+        <div class="ft-logo-icon">⚡</div>
+        <span class="ft-logo-name">FlowTask</span>
+      </div>
+      <div class="ft-header-right">
+        <div class="ft-ai-badge">
+          <div class="ft-ai-dot"></div>
+          AI Active
+        </div>
+        <div class="ft-stats" id="stats-bar">
+          <div class="ft-stat"><span class="ft-stat-num" id="stat-todo">0</span> pending</div>
+          <div class="ft-stat"><span class="ft-stat-num" id="stat-prog">0</span> active</div>
+          <div class="ft-stat"><span class="ft-stat-num" id="stat-done">0</span> done</div>
+        </div>
+        <!-- User profile (hidden until logged in) -->
+        <div class="ft-user-profile" id="user-profile" style="display:none;" title="Account">
+          <div class="ft-user-avatar-placeholder" id="user-avatar-placeholder">?</div>
+          <img class="ft-user-avatar" id="user-avatar-img" src="" alt="avatar" style="display:none;" />
+          <span class="ft-user-name" id="user-name">User</span>
+        </div>
+        <button class="ft-logout-btn" id="logout-btn" style="display:none;">Sign out</button>
+      </div>
+    </header>
+
+    <!-- ── AI Insights panel ── -->
+    <div class="ft-insights" id="insights-panel" style="display:none;">
+      <div>
+        <div class="ft-insight-val" id="ins-done-today">0</div>
+        <div class="ft-insight-label">done today</div>
+      </div>
+      <div class="ft-insight-divider"></div>
+      <div>
+        <div class="ft-insight-val" id="ins-pending">0</div>
+        <div class="ft-insight-label">pending</div>
+      </div>
+      <div class="ft-insight-divider"></div>
+      <div>
+        <div class="ft-insight-val" id="ins-active">0</div>
+        <div class="ft-insight-label">in progress</div>
+      </div>
+      <div class="ft-insight-divider"></div>
+      <div class="ft-insight-ai" id="ins-message">
+        <strong>AI:</strong> Loading your insights...
+      </div>
+    </div>
+
+    <!-- ── Input bar ── -->
+    <div class="ft-input-bar" id="input-bar">
+      <span style="font-size:16px;color:#475569;">✦</span>
+      <input
+        class="ft-input"
+        id="task-input"
+        placeholder="Describe a task — AI will categorize it..."
+        autocomplete="off"
+        maxlength="200"
+      />
+      <div class="ft-ai-typing" id="typing-ind" style="display:none;">
+        <div class="ft-typing-dot"></div>
+        <div class="ft-typing-dot"></div>
+        <div class="ft-typing-dot"></div>
+      </div>
+      <!-- Voice input button -->
+      <button class="ft-voice-btn" id="voice-btn" title="Voice input">🎙</button>
+      <button class="ft-add-btn" id="add-btn">
+        <span>+</span> Add Task
+      </button>
+    </div>
+
+    <div class="ft-hint">
+      <span>Try:</span>
+      <span class="ft-hint-chip" onclick="fillInput('Working on the Q4 report')" style="cursor:pointer;">"Working on the Q4 report"</span>
+      <span class="ft-hint-chip" onclick="fillInput('Completed the design review')" style="cursor:pointer;">"Completed the design review"</span>
+      <span class="ft-hint-chip" onclick="fillInput('Need to review PRs')" style="cursor:pointer;">"Need to review PRs"</span>
+    </div>
+
+    <div id="error-msg" class="ft-error" style="display:none;"></div>
+
+    <!-- ── Kanban columns ── -->
+    <div class="ft-columns">
+      <div class="ft-col col-todo" id="col-todo" ondragover="dragOver(event,'todo')" ondragleave="dragLeave(event)" ondrop="drop(event,'todo')">
+        <div class="ft-col-header">
+          <div class="ft-col-title"><div class="ft-col-dot"></div> To Do</div>
+          <div class="ft-col-count" id="count-todo">0</div>
+        </div>
+        <div class="ft-col-body" id="body-todo">
+          <div class="ft-empty" id="empty-todo">
+            <div class="ft-empty-icon">○</div>
+            <div class="ft-empty-msg">Your queue is clear.<br>Add something to work on.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ft-col col-inprogress" id="col-inprogress" ondragover="dragOver(event,'inprogress')" ondragleave="dragLeave(event)" ondrop="drop(event,'inprogress')">
+        <div class="ft-col-header">
+          <div class="ft-col-title"><div class="ft-col-dot"></div> In Progress</div>
+          <div class="ft-col-count" id="count-inprogress">0</div>
+        </div>
+        <div class="ft-col-body" id="body-inprogress">
+          <div class="ft-empty" id="empty-inprogress">
+            <div class="ft-empty-icon">◑</div>
+            <div class="ft-empty-msg">Nothing in motion yet.<br>Drag a task here to start.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ft-col col-completed" id="col-completed" ondragover="dragOver(event,'completed')" ondragleave="dragLeave(event)" ondrop="drop(event,'completed')">
+        <div class="ft-col-header">
+          <div class="ft-col-title"><div class="ft-col-dot"></div> Completed</div>
+          <div class="ft-col-count" id="count-completed">0</div>
+        </div>
+        <div class="ft-col-body" id="body-completed">
+          <div class="ft-empty" id="empty-completed">
+            <div class="ft-empty-icon">✦</div>
+            <div class="ft-empty-msg">Wins show up here.<br>Ship something.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+<!-- ── Firebase v8 CDN (compat mode) ── -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+<script>
+  /* ─────────────────────────────────────────────
+     FIREBASE CONFIG
+     Replace these values with your Firebase project settings.
+     Get them from: Firebase Console → Project Settings → Your apps
+  ───────────────────────────────────────────── */
+  const firebaseConfig = {
+    apiKey:            "AIzaSyB3VpPwec0TS0xgIqtkoD4ktOFyc2hdXa4",
+    authDomain:        "flowtask-4561d.firebaseapp.com",
+    projectId:         "flowtask-4561d",
+    storageBucket:     "flowtask-4561d.firebasestorage.app",
+    messagingSenderId: "8091901482",
+    appId:             "1:8091901482:web:cd6b6eb85c87b0a4696d53"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db   = firebase.firestore();
+</script>
+
+<script>
+  /* ─────────────────────────────────────────────
+     STATE
+  ───────────────────────────────────────────── */
+  let currentUser   = null;   // Firebase user object
+  let dragId        = null;   // ID of card being dragged
+  let unsubscribeFn = null;   // Firestore real-time listener cleanup
+  // In-memory task cache: { [docId]: { text, col, createdAt, userId } }
+  const taskCache   = {};
+
+  /* ─────────────────────────────────────────────
+     DOM REFS
+  ───────────────────────────────────────────── */
+  const authOverlay   = document.getElementById('auth-overlay');
+  const googleBtn     = document.getElementById('google-signin-btn');
+  const logoutBtn     = document.getElementById('logout-btn');
+  const userProfile   = document.getElementById('user-profile');
+  const userNameEl    = document.getElementById('user-name');
+  const userAvatarImg = document.getElementById('user-avatar-img');
+  const userAvatarPh  = document.getElementById('user-avatar-placeholder');
+  const addBtn        = document.getElementById('add-btn');
+  const taskInput     = document.getElementById('task-input');
+  const typingInd     = document.getElementById('typing-ind');
+  const inputBar      = document.getElementById('input-bar');
+  const insightsPanel = document.getElementById('insights-panel');
+  const voiceBtn      = document.getElementById('voice-btn');
+
+  /* ─────────────────────────────────────────────
+     AUTHENTICATION
+  ───────────────────────────────────────────── */
+
+  /** Sign in with Google popup */
+  googleBtn.addEventListener('click', async () => {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    try {
+      await auth.signInWithPopup(provider);
+    } catch (err) {
+      showToast('Sign-in failed: ' + err.message, '❌');
+    }
+  });
+
+  /** Sign out */
+  logoutBtn.addEventListener('click', async () => {
+    if (unsubscribeFn) unsubscribeFn(); // stop Firestore listener
+    clearBoard();
+    await auth.signOut();
+  });
+
+  /** Auth state observer — runs on every page load */
+  auth.onAuthStateChanged(user => {
+    if (user) {
+      currentUser = user;
+      onUserSignedIn(user);
+    } else {
+      currentUser = null;
+      onUserSignedOut();
+    }
+  });
+
+  /** Called when a user is authenticated */
+  function onUserSignedIn(user) {
+    // Hide auth overlay with fade
+    authOverlay.style.animation = 'fade-in 0.3s ease reverse';
+    setTimeout(() => authOverlay.style.display = 'none', 280);
+
+    // Show user profile in header
+    userNameEl.textContent = user.displayName?.split(' ')[0] || 'User';
+    if (user.photoURL) {
+      userAvatarImg.src = user.photoURL;
+      userAvatarImg.style.display = 'block';
+      userAvatarPh.style.display  = 'none';
+    } else {
+      userAvatarPh.textContent    = (user.displayName || 'U')[0].toUpperCase();
+      userAvatarPh.style.display  = 'flex';
+      userAvatarImg.style.display = 'none';
+    }
+    userProfile.style.display = 'flex';
+    logoutBtn.style.display   = 'block';
+
+    // Show insights panel
+    insightsPanel.style.display = 'flex';
+
+    // Start real-time Firestore sync
+    subscribeToTasks(user.uid);
+    showToast(`Welcome back, ${user.displayName?.split(' ')[0] || 'there'} 👋`);
+  }
+
+  /** Called when user signs out */
+  function onUserSignedOut() {
+    authOverlay.style.display   = 'flex';
+    authOverlay.style.animation = 'fade-in 0.4s ease';
+    userProfile.style.display   = 'none';
+    logoutBtn.style.display     = 'none';
+    insightsPanel.style.display = 'none';
+    clearBoard();
+  }
+
+  /* ─────────────────────────────────────────────
+     FIRESTORE — REAL-TIME SYNC
+  ───────────────────────────────────────────── */
+
+  /** Subscribe to user's tasks with onSnapshot for real-time updates */
+  function subscribeToTasks(uid) {
+    // Show loading skeletons while first load happens
+    showSkeletons();
+
+    unsubscribeFn = db.collection('tasks')
+      .where('userId', '==', uid)
+      .orderBy('createdAt', 'asc')
+      .onSnapshot(snapshot => {
+        clearBoard();
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          taskCache[doc.id] = data;
+          addCard(doc.id, data.text, data.col);
+        });
+        updateCounts();
+        updateInsights();
+      }, err => {
+        console.error('Firestore error:', err);
+        showError('Sync error. Check your connection.');
+      });
+  }
+
+  /** Add a new task document to Firestore */
+  async function addTaskToFirestore(text, col) {
+    if (!currentUser) return null;
+    const docRef = await db.collection('tasks').add({
+      userId:    currentUser.uid,
+      text:      text,
+      col:       col,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    return docRef.id;
+  }
+
+  /** Update a task's column in Firestore (called on drag-drop) */
+  async function updateTaskCol(docId, newCol) {
+    await db.collection('tasks').doc(docId).update({ col: newCol });
+  }
+
+  /** Delete a task document from Firestore */
+  async function deleteTaskFromFirestore(docId) {
+    await db.collection('tasks').doc(docId).delete();
+  }
+
+  /* ─────────────────────────────────────────────
+     BOARD — RENDER
+  ───────────────────────────────────────────── */
+
+  /** Clear all cards from the board (not the empty-state placeholders) */
+  function clearBoard() {
+    ['todo', 'inprogress', 'completed'].forEach(col => {
+      const body = document.getElementById('body-' + col);
+      // Remove only card elements, keep the empty-state div
+      Array.from(body.querySelectorAll('.ft-card')).forEach(c => c.remove());
+    });
+    Object.keys(taskCache).forEach(k => delete taskCache[k]);
+    updateCounts();
+  }
+
+  /** Create a card DOM element */
+  function createCard(id, text, col) {
+    const card = document.createElement('div');
+    card.className  = 'ft-card';
+    card.draggable  = true;
+    card.id         = 'card-' + id;
+    card.dataset.id = id;
+
+    card.innerHTML = `
+      <div class="ft-card-bar"></div>
+      <div class="ft-card-text">${escapeHtml(text)}</div>
+      <div class="ft-card-footer">
+        <span class="ft-card-time">⏱ ${getTime()}</span>
+        <div class="ft-card-actions">
+          <button class="ft-card-btn" onclick="deleteTask('${id}')" title="Delete task">✕</button>
+        </div>
+      </div>`;
+
+    card.addEventListener('dragstart', () => {
+      dragId = id;
+      setTimeout(() => card.classList.add('dragging'), 0);
+    });
+    card.addEventListener('dragend', () => card.classList.remove('dragging'));
+
+    return card;
+  }
+
+  /** Append a card to the correct column body */
+  function addCard(id, text, col) {
+    const body = document.getElementById('body-' + col);
+    if (!body) return;
+    // Avoid duplicates (onSnapshot can fire multiple times)
+    if (document.getElementById('card-' + id)) return;
+    body.appendChild(createCard(id, text, col));
+  }
+
+  /** Show skeleton loaders while tasks are loading */
+  function showSkeletons() {
+    ['todo', 'inprogress', 'completed'].forEach(col => {
+      const body = document.getElementById('body-' + col);
+      const sk = document.createElement('div');
+      sk.className = 'ft-loading ft-skeleton-wrap';
+      sk.innerHTML = '<div class="ft-skeleton"></div><div class="ft-skeleton" style="opacity:0.6"></div>';
+      body.appendChild(sk);
+    });
+    setTimeout(() => {
+      document.querySelectorAll('.ft-skeleton-wrap').forEach(el => el.remove());
+    }, 3000); // safety cleanup
+  }
+
+  /* ─────────────────────────────────────────────
+     DRAG & DROP
+  ───────────────────────────────────────────── */
+
+  function dragOver(e, col) {
+    e.preventDefault();
+    document.getElementById('col-' + col).classList.add('drag-over');
+  }
+
+  function dragLeave(e) {
+    e.currentTarget.classList.remove('drag-over');
+  }
+
+  async function drop(e, col) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('drag-over');
+    if (!dragId || !taskCache[dragId]) return;
+    if (taskCache[dragId].col === col) return; // no-op if same column
+
+    // Optimistic UI update
+    const card = document.getElementById('card-' + dragId);
+    if (card) card.remove();
+    taskCache[dragId].col = col;
+    addCard(dragId, taskCache[dragId].text, col);
+    updateCounts();
+    updateInsights();
+
+    // Persist to Firestore
+    try {
+      await updateTaskCol(dragId, col);
+    } catch (err) {
+      showToast('Failed to move task', '❌');
+    }
+    dragId = null;
+  }
+
+  /* ─────────────────────────────────────────────
+     TASK ACTIONS
+  ───────────────────────────────────────────── */
+
+  /** Delete a task — removes from Firestore, UI updates via onSnapshot */
+  async function deleteTask(id) {
+    // Optimistic removal
+    document.getElementById('card-' + id)?.remove();
+    delete taskCache[id];
+    updateCounts();
+    updateInsights();
+
+    try {
+      await deleteTaskFromFirestore(id);
+    } catch (err) {
+      showToast('Delete failed', '❌');
+    }
+  }
+
+  /** Main add-task handler */
+  async function handleAdd() {
+    const val = taskInput.value.trim();
+    if (!val) return;
+    if (!currentUser) { showToast('Please sign in first', '⚠️'); return; }
+
+    taskInput.value = '';
+    setProcessing(true);
+
+    try {
+      // Call serverless AI classifier
+      const res  = await fetch('/api/classify', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ text: val })
+      });
+      const data = await res.json();
+      const text = data.title    || val;
+      const col  = data.category || 'todo';
+
+      // Save to Firestore — onSnapshot will add the card
+      await addTaskToFirestore(text, col);
+      showToast(`Added to ${colLabel(col)} ✦`);
+    } catch {
+      // Fallback: save as-is to todo
+      try {
+        await addTaskToFirestore(val, 'todo');
+        showToast('Added to To Do');
+      } catch (err) {
+        showError('Could not save task. Check your connection.');
+      }
+    } finally {
+      setProcessing(false);
+    }
+  }
+
+  /* ─────────────────────────────────────────────
+     AI INSIGHTS PANEL
+  ───────────────────────────────────────────── */
+
+  const motivationalMessages = [
+    "You're on a roll — keep the momentum going.",
+    "Focus on one task at a time. Progress compounds.",
+    "Every completed task is a step forward. Keep shipping.",
+    "Great work so far. What's the next win?",
+    "Consistency beats intensity. Show up every day.",
+    "The best time to start was yesterday. The next best time is now.",
+    "Small steps, big results. You've got this.",
+    "Done is better than perfect. Ship it."
+  ];
+
+  function updateInsights() {
+    const tasks   = Object.values(taskCache);
+    const today   = new Date().toDateString();
+    const done    = tasks.filter(t => t.col === 'completed');
+    const pending = tasks.filter(t => t.col === 'todo');
+    const active  = tasks.filter(t => t.col === 'inprogress');
+
+    // "Done today" — tasks completed today (createdAt is approximate since we
+    // don't store a completedAt; this counts tasks in completed column)
+    document.getElementById('ins-done-today').textContent = done.length;
+    document.getElementById('ins-pending').textContent    = pending.length;
+    document.getElementById('ins-active').textContent     = active.length;
+
+    // Pick a motivational message based on completion ratio
+    const total = tasks.length;
+    let msg;
+    if (total === 0) {
+      msg = "Add your first task to get started.";
+    } else if (done.length === total) {
+      msg = "🎉 Everything done! You crushed it today.";
+    } else {
+      msg = motivationalMessages[Math.floor(Math.random() * motivationalMessages.length)];
+    }
+    document.getElementById('ins-message').innerHTML = `<strong>AI:</strong> ${msg}`;
+  }
+
+  /* ─────────────────────────────────────────────
+     VOICE INPUT
+  ───────────────────────────────────────────── */
+
+  let recognition = null;
+
+  voiceBtn.addEventListener('click', () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      showToast('Voice input not supported in this browser', '⚠️');
+      return;
+    }
+
+    if (recognition) {
+      recognition.stop();
+      return;
+    }
+
+    recognition = new SpeechRecognition();
+    recognition.lang        = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    voiceBtn.classList.add('listening');
+    voiceBtn.textContent = '⏹';
+
+    recognition.onresult = e => {
+      taskInput.value = e.results[0][0].transcript;
+      taskInput.focus();
+    };
+
+    recognition.onerror = () => {
+      showToast('Voice recognition error', '❌');
+    };
+
+    recognition.onend = () => {
+      voiceBtn.classList.remove('listening');
+      voiceBtn.textContent = '🎙';
+      recognition = null;
+    };
+
+    recognition.start();
+  });
+
+  /* ─────────────────────────────────────────────
+     UI HELPERS
+  ───────────────────────────────────────────── */
+
+  function updateCounts() {
+    const cols = ['todo', 'inprogress', 'completed'];
+    const statIds = { todo: 'stat-todo', inprogress: 'stat-prog', completed: 'stat-done' };
+
+    cols.forEach(col => {
+      const count = Object.values(taskCache).filter(t => t.col === col).length;
+      const countEl = document.getElementById('count-' + col);
+      const statEl  = document.getElementById(statIds[col]);
+
+      if (countEl) countEl.textContent = count;
+      if (statEl)  {
+        statEl.textContent = count;
+        statEl.classList.remove('stat-pop');
+        void statEl.offsetWidth; // reflow to restart animation
+        statEl.classList.add('stat-pop');
+      }
+
+      // Toggle empty state
+      const emptyEl = document.getElementById('empty-' + col);
+      if (emptyEl) emptyEl.style.display = count === 0 ? 'flex' : 'none';
+    });
+  }
+
+  function setProcessing(on) {
+    addBtn.disabled = on;
+    typingInd.style.display = on ? 'flex' : 'none';
+    inputBar.classList.toggle('processing', on);
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('error-msg');
+    el.textContent = msg;
+    el.style.display = 'block';
+    setTimeout(() => el.style.display = 'none', 4000);
+  }
+
+  function showToast(msg, icon = '✦') {
+    // Remove existing toasts
+    document.querySelectorAll('.ft-toast').forEach(t => t.remove());
+
+    const toast = document.createElement('div');
+    toast.className = 'ft-toast';
+    toast.innerHTML = `<span class="ft-toast-icon">${icon}</span><span>${escapeHtml(msg)}</span>`;
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.animation = 'toast-out 0.25s ease forwards';
+      setTimeout(() => toast.remove(), 250);
+    }, 2500);
+  }
+
+  function fillInput(text) {
+    taskInput.value = text;
+    taskInput.focus();
+  }
+
+  function getTime() {
+    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function colLabel(col) {
+    return { todo: 'To Do', inprogress: 'In Progress', completed: 'Completed' }[col] || col;
+  }
+
+  /** Prevent XSS when rendering user-supplied text */
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  /* ─────────────────────────────────────────────
+     INPUT BAR EVENTS
+  ───────────────────────────────────────────── */
+
+  addBtn.addEventListener('click', handleAdd);
+
+  taskInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') handleAdd();
+  });
+
+  taskInput.addEventListener('focus', () => inputBar.classList.add('focused'));
+  taskInput.addEventListener('blur',  () => inputBar.classList.remove('focused'));
+
+  /* ─────────────────────────────────────────────
+     PWA — SERVICE WORKER REGISTRATION
+  ───────────────────────────────────────────── */
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(err => {
+        console.warn('SW registration failed:', err);
+      });
+    });
+  }
+</script>
+</body>
+</html>
