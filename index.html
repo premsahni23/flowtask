@@ -752,6 +752,165 @@
   .ft-card-actions { opacity: 1; }
   .ft-progress-label { display: none; }
 }
+
+/* ── AI Assistant panel ── */
+.ft-assistant {
+  background: rgba(15,20,35,0.6);
+  border: 1px solid rgba(99,51,255,0.15);
+  border-radius: 16px; padding: 16px 20px;
+  margin-bottom: 24px;
+}
+
+.ft-assistant-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.ft-assistant-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: #a78bfa;
+  display: flex; align-items: center; gap: 6px;
+}
+
+.ft-assistant-body {
+  display: flex; gap: 8px; flex-wrap: wrap;
+}
+
+.ft-assistant-input {
+  flex: 1; min-width: 180px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px; padding: 8px 12px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 13px; color: #e2e8f0; outline: none;
+  caret-color: #8b5cf6;
+}
+
+.ft-assistant-input::placeholder { color: #475569; }
+.ft-assistant-input:focus { border-color: rgba(99,51,255,0.4); }
+
+.ft-assistant-ask-btn {
+  background: rgba(99,51,255,0.2);
+  border: 1px solid rgba(99,51,255,0.3);
+  border-radius: 10px; padding: 8px 14px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 12px; font-weight: 600; color: #a78bfa;
+  cursor: pointer; transition: all 0.2s; white-space: nowrap;
+}
+
+.ft-assistant-ask-btn:hover { background: rgba(99,51,255,0.3); }
+.ft-assistant-ask-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.ft-assistant-answer {
+  margin-top: 10px; font-size: 13px; color: #94a3b8;
+  line-height: 1.6; min-height: 20px;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 8px; border-left: 2px solid rgba(99,51,255,0.4);
+  display: none;
+}
+
+.ft-assistant-answer.visible { display: block; }
+
+.ft-assistant-quick {
+  display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px;
+}
+
+.ft-assistant-chip {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px; padding: 4px 10px;
+  font-size: 11px; color: #64748b; cursor: pointer;
+  transition: all 0.15s;
+}
+
+.ft-assistant-chip:hover { background: rgba(99,51,255,0.1); color: #a78bfa; border-color: rgba(99,51,255,0.3); }
+
+/* ── Planner panel ── */
+.ft-planner {
+  background: rgba(15,20,35,0.6);
+  border: 1px solid rgba(16,185,129,0.15);
+  border-radius: 16px; padding: 16px 20px;
+  margin-bottom: 24px;
+}
+
+.ft-planner-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.ft-planner-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: #34d399;
+  display: flex; align-items: center; gap: 6px;
+}
+
+.ft-planner-body { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.ft-planner-input {
+  flex: 1; min-width: 180px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px; padding: 8px 12px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 13px; color: #e2e8f0; outline: none;
+  caret-color: #10b981;
+}
+
+.ft-planner-input::placeholder { color: #475569; }
+.ft-planner-input:focus { border-color: rgba(16,185,129,0.4); }
+
+.ft-planner-btn {
+  background: rgba(16,185,129,0.15);
+  border: 1px solid rgba(16,185,129,0.3);
+  border-radius: 10px; padding: 8px 14px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 12px; font-weight: 600; color: #34d399;
+  cursor: pointer; transition: all 0.2s; white-space: nowrap;
+}
+
+.ft-planner-btn:hover { background: rgba(16,185,129,0.25); }
+.ft-planner-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.ft-planner-result {
+  margin-top: 12px; display: none;
+}
+
+.ft-planner-result.visible { display: block; }
+
+.ft-plan-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
+  font-size: 12px;
+}
+
+.ft-plan-item:last-child { border-bottom: none; }
+
+.ft-plan-time {
+  font-family: 'Syne', sans-serif; font-weight: 700;
+  color: #34d399; font-size: 11px; min-width: 60px;
+}
+
+.ft-plan-task { color: #94a3b8; flex: 1; }
+
+.ft-plan-add-all {
+  margin-top: 10px; width: 100%;
+  background: rgba(16,185,129,0.1);
+  border: 1px solid rgba(16,185,129,0.2);
+  border-radius: 8px; padding: 8px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 12px; font-weight: 600; color: #34d399;
+  cursor: pointer; transition: all 0.2s;
+}
+
+.ft-plan-add-all:hover { background: rgba(16,185,129,0.2); }
+
+@media (max-width: 768px) {
+  .ft-assistant, .ft-planner { padding: 14px 16px; margin-bottom: 16px; }
+  .ft-assistant-input, .ft-planner-input { font-size: 15px; }
+}
 </style>
 
 <!-- ── Auth overlay (shown until user signs in) ── -->
@@ -835,6 +994,54 @@
       <div class="ft-insight-divider"></div>
       <div class="ft-insight-ai" id="ins-message">
         <strong>AI:</strong> Loading your insights...
+      </div>
+    </div>
+
+    <!-- ── AI Assistant panel ── -->
+    <div class="ft-assistant" id="assistant-panel" style="display:none;">
+      <div class="ft-assistant-header">
+        <div class="ft-assistant-title">
+          <span>✦</span> AI Assistant
+        </div>
+      </div>
+      <div class="ft-assistant-body">
+        <input
+          class="ft-assistant-input"
+          id="assistant-input"
+          placeholder="Ask anything… e.g. What should I do next?"
+          maxlength="200"
+          autocomplete="off"
+        />
+        <button class="ft-assistant-ask-btn" id="assistant-ask-btn">Ask AI</button>
+      </div>
+      <div class="ft-assistant-quick">
+        <span class="ft-assistant-chip" onclick="askAssistant('What should I do next?')">What should I do next?</span>
+        <span class="ft-assistant-chip" onclick="askAssistant('What did I complete today?')">What did I complete today?</span>
+        <span class="ft-assistant-chip" onclick="askAssistant('How am I doing?')">How am I doing?</span>
+      </div>
+      <div class="ft-assistant-answer" id="assistant-answer"></div>
+    </div>
+
+    <!-- ── AI Daily Planner panel ── -->
+    <div class="ft-planner" id="planner-panel" style="display:none;">
+      <div class="ft-planner-header">
+        <div class="ft-planner-title">
+          <span>📅</span> Daily Planner
+        </div>
+      </div>
+      <div class="ft-planner-body">
+        <input
+          class="ft-planner-input"
+          id="planner-input"
+          placeholder="Plan my day: gym, coding, meeting…"
+          maxlength="300"
+          autocomplete="off"
+        />
+        <button class="ft-planner-btn" id="planner-btn">Generate Plan</button>
+      </div>
+      <div class="ft-planner-result" id="planner-result">
+        <div id="planner-items"></div>
+        <button class="ft-plan-add-all" id="planner-add-all">+ Add all tasks to board</button>
       </div>
     </div>
 
@@ -969,6 +1176,19 @@
   const progressWrap  = document.getElementById('progress-wrap');
   const progressFill  = document.getElementById('progress-fill');
   const progressPct   = document.getElementById('progress-pct');
+  const assistantPanel = document.getElementById('assistant-panel');
+  const assistantInput = document.getElementById('assistant-input');
+  const assistantAskBtn = document.getElementById('assistant-ask-btn');
+  const assistantAnswer = document.getElementById('assistant-answer');
+  const plannerPanel  = document.getElementById('planner-panel');
+  const plannerInput  = document.getElementById('planner-input');
+  const plannerBtn    = document.getElementById('planner-btn');
+  const plannerResult = document.getElementById('planner-result');
+  const plannerItems  = document.getElementById('planner-items');
+  const plannerAddAll = document.getElementById('planner-add-all');
+
+  // Stores the last generated plan so "Add all" can use it
+  let currentPlan = [];
 
   /* ─────────────────────────────────────────────
      PWA — beforeinstallprompt
@@ -1072,9 +1292,13 @@
     // Show insights + progress panels
     insightsPanel.style.display = 'flex';
     progressWrap.style.display  = 'flex';
+    assistantPanel.style.display = 'block';
+    plannerPanel.style.display   = 'block';
 
     // Start real-time Firestore sync
     subscribeToTasks(user.uid);
+    // Start 30-min reminder loop
+    startReminders();
     showToast(`Welcome back, ${user.displayName?.split(' ')[0] || 'there'} 👋`);
   }
 
@@ -1084,8 +1308,11 @@
     authOverlay.style.animation = 'fade-in 0.4s ease';
     userProfile.style.display   = 'none';
     logoutBtn.style.display     = 'none';
-    insightsPanel.style.display = 'none';
-    progressWrap.style.display  = 'none';
+    insightsPanel.style.display  = 'none';
+    progressWrap.style.display   = 'none';
+    assistantPanel.style.display = 'none';
+    plannerPanel.style.display   = 'none';
+    stopReminders();
     clearBoard();
   }
 
@@ -1535,6 +1762,178 @@
 
   taskInput.addEventListener('focus', () => inputBar.classList.add('focused'));
   taskInput.addEventListener('blur',  () => inputBar.classList.remove('focused'));
+
+  /* ─────────────────────────────────────────────
+     AI ASSISTANT
+     Sends the user's question + current board
+     state to /api/assistant and shows the answer.
+  ───────────────────────────────────────────── */
+
+  async function askAssistant(question) {
+    const q = question || assistantInput.value.trim();
+    if (!q) return;
+
+    assistantInput.value = '';
+    assistantAskBtn.disabled = true;
+    assistantAnswer.textContent = '✦ Thinking…';
+    assistantAnswer.classList.add('visible');
+
+    // Build board context from taskCache
+    const tasks     = Object.values(taskCache);
+    const todo      = tasks.filter(t => t.col === 'todo').map(t => t.text);
+    const inprogress = tasks.filter(t => t.col === 'inprogress').map(t => t.text);
+    const completed = tasks.filter(t => t.col === 'completed').map(t => t.text);
+
+    try {
+      const res  = await fetch('/api/assistant', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ question: q, todo, inprogress, completed })
+      });
+      const data = await res.json();
+      assistantAnswer.textContent = data.answer || 'No answer returned.';
+    } catch (err) {
+      // Client-side fallback if API is unreachable
+      if (inprogress.length > 0) {
+        assistantAnswer.textContent = `Focus on: "${inprogress[0]}"`;
+      } else if (todo.length > 0) {
+        assistantAnswer.textContent = `Start with: "${todo[0]}"`;
+      } else {
+        assistantAnswer.textContent = "You're all caught up! Add a new task.";
+      }
+    } finally {
+      assistantAskBtn.disabled = false;
+    }
+  }
+
+  assistantAskBtn.addEventListener('click', () => askAssistant());
+  assistantInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') askAssistant();
+  });
+
+  /* ─────────────────────────────────────────────
+     AI DAILY PLANNER
+     Sends task list to /api/planner, renders the
+     schedule, and lets user add all tasks at once.
+  ───────────────────────────────────────────── */
+
+  plannerBtn.addEventListener('click', async () => {
+    const val = plannerInput.value.trim();
+    if (!val) return;
+
+    plannerBtn.disabled = true;
+    plannerBtn.textContent = '⏳ Planning…';
+    plannerResult.classList.remove('visible');
+    plannerItems.innerHTML = '';
+    currentPlan = [];
+
+    try {
+      const res  = await fetch('/api/planner', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ tasks: val })
+      });
+      const data = await res.json();
+      currentPlan = data.plan || [];
+
+      if (currentPlan.length === 0) {
+        plannerItems.innerHTML = '<p style="font-size:12px;color:#475569;">Could not generate plan. Try again.</p>';
+      } else {
+        plannerItems.innerHTML = currentPlan.map(item => `
+          <div class="ft-plan-item">
+            <span class="ft-plan-time">${escapeHtml(item.time)}</span>
+            <span class="ft-plan-task">${escapeHtml(item.task)}</span>
+          </div>`).join('');
+      }
+
+      plannerResult.classList.add('visible');
+    } catch (err) {
+      plannerItems.innerHTML = '<p style="font-size:12px;color:#f87171;">Error generating plan. Check connection.</p>';
+      plannerResult.classList.add('visible');
+    } finally {
+      plannerBtn.disabled = false;
+      plannerBtn.textContent = 'Generate Plan';
+    }
+  });
+
+  plannerInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') plannerBtn.click();
+  });
+
+  // Add all planned tasks to Firestore as "todo"
+  plannerAddAll.addEventListener('click', async () => {
+    if (!currentUser) { showToast('Please sign in first', '⚠️'); return; }
+    if (currentPlan.length === 0) return;
+
+    plannerAddAll.disabled = true;
+    plannerAddAll.textContent = '⏳ Adding…';
+
+    let added = 0;
+    for (const item of currentPlan) {
+      try {
+        await addTaskToFirestore(`${item.task} (${item.time})`, 'todo');
+        added++;
+      } catch (e) {
+        console.warn('[planner] failed to add:', item.task);
+      }
+    }
+
+    showToast(`Added ${added} tasks to To Do ✦`);
+    plannerAddAll.disabled = false;
+    plannerAddAll.textContent = '+ Add all tasks to board';
+    plannerInput.value = '';
+    plannerResult.classList.remove('visible');
+    currentPlan = [];
+  });
+
+  /* ─────────────────────────────────────────────
+     SMART REMINDERS
+     Every 30 minutes, show a toast based on the
+     current board state. Stops on sign-out.
+  ───────────────────────────────────────────── */
+
+  let reminderInterval = null;
+
+  function startReminders() {
+    stopReminders(); // clear any existing interval first
+    reminderInterval = setInterval(fireReminder, 30 * 60 * 1000);
+  }
+
+  function stopReminders() {
+    if (reminderInterval) {
+      clearInterval(reminderInterval);
+      reminderInterval = null;
+    }
+  }
+
+  function fireReminder() {
+    const tasks      = Object.values(taskCache);
+    const pending    = tasks.filter(t => t.col === 'todo');
+    const inprogress = tasks.filter(t => t.col === 'inprogress');
+    const completed  = tasks.filter(t => t.col === 'completed');
+
+    let msg, icon;
+
+    if (tasks.length === 0) return; // nothing to remind about
+
+    if (inprogress.length > 0) {
+      msg  = `Still working on "${inprogress[0].text}"? Keep going! 💪`;
+      icon = '⏱';
+    } else if (pending.length > 0) {
+      msg  = pending.length === 1
+        ? `Time to start: "${pending[0].text}"`
+        : `You have ${pending.length} pending tasks. Pick one and start. 🚀`;
+      icon = '🔔';
+    } else if (completed.length === tasks.length) {
+      msg  = "Everything done! 🎉 Great work today.";
+      icon = '✅';
+    } else {
+      msg  = "Check your board — any tasks to move forward?";
+      icon = '📋';
+    }
+
+    showToast(msg, icon);
+  }
 </script>
 </body>
 </html>
