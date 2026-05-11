@@ -2100,11 +2100,25 @@
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ message: q, history, todo, inprogress, completed })
       });
+
+      // Guard against non-JSON responses (e.g. Vercel 500 HTML page)
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        throw new Error(`Non-JSON response (HTTP ${res.status})`);
+      }
+
       const data = await res.json();
-      answer = data.answer || "I'm not sure how to answer that. Try rephrasing?";
+      console.log('[assistant] response:', data);
+
+      // Accept both `reply` (new) and `answer` (legacy) field names
+      answer = data.reply || data.answer || '';
+
+      if (!answer) {
+        throw new Error('Empty reply from server');
+      }
     } catch (err) {
       console.warn('[assistant] fetch failed:', err.message);
-      // Client-side fallback
+      // Client-side fallback — always shows something useful
       if (inprogress.length > 0) {
         answer = `Keep going on "${inprogress[0]}" — you've already started it.`;
       } else if (todo.length > 0) {
