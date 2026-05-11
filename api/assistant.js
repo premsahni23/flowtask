@@ -1,4 +1,4 @@
-/**
+﻿/**
  * POST /api/assistant
  *
  * Human-like conversational AI companion — emotionally intelligent,
@@ -126,59 +126,41 @@ FOLLOW-UP QUESTION EXAMPLES (use occasionally, not every reply):
 Respond naturally. Think before answering. Be the assistant the user actually needs right now.`;
 }
 
-// ── Reply sanitizer ───────────────────────────────────────────────────────────
-// Strips any system-prompt phrases that a model might echo back.
-// Applied to EVERY reply before it leaves this function.
+// -- Reply sanitizer -------------------------------------------------------
+// Strips system-prompt phrases that a model might echo back.
+// Uses simple literal indexOf removal -- no regex sentence-wiping.
 const BLOCKED_PHRASES = [
-  // System prompt identity lines
   'You are FlowTask AI',
-  'you are flowtask ai',
-  'FlowTask AI —',
-  'FlowTask AI -',
+  'FlowTask AI —', 'FlowTask AI -',
   'highly intelligent productivity companion',
   'intelligent, emotionally aware productivity companion',
   'Think of yourself as a blend of Jarvis',
   'blend of Jarvis',
   'supportive coach, and a smart friend',
-  // System prompt section headers
-  'PERSONALITY:',
-  'CURRENT CONTEXT:',
-  'CONVERSATION RULES:',
-  'FOLLOW-UP QUESTION EXAMPLES',
-  'EMOTIONAL_STATE:',
-  // Context primer markers
-  '[Board snapshot for this session]',
-  '[End snapshot',
+  'PERSONALITY:', 'CURRENT CONTEXT:', 'CONVERSATION RULES:',
+  'FOLLOW-UP QUESTION EXAMPLES', 'EMOTIONAL_STATE:',
+  '[Board snapshot for this session]', '[End snapshot',
   'use this context to answer naturally',
-  // Generic system-prompt tells
-  'system prompt',
-  'You help users',
-  'You have access to',
-  'Never say "As an AI"',
-  'Never use markdown',
+  'Never say "As an AI"', 'Never use markdown',
   'Respond naturally. Think before answering',
 ];
 
 function sanitizeReply(text) {
-  if (!text) return '';
+  if (!text || typeof text !== 'string') return '';
   let out = text;
-
+  // Literal removal only -- no regex, no sentence-wiping
   for (const phrase of BLOCKED_PHRASES) {
-    // Case-insensitive replace of the phrase and any sentence it's part of
-    const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    // Remove the whole sentence containing the blocked phrase
-    out = out.replace(new RegExp(`[^.!?]*${escaped}[^.!?]*[.!?]?`, 'gi'), '');
+    let idx = out.toLowerCase().indexOf(phrase.toLowerCase());
+    while (idx !== -1) {
+      out = out.slice(0, idx) + out.slice(idx + phrase.length);
+      idx = out.toLowerCase().indexOf(phrase.toLowerCase());
+    }
   }
-
-  // Clean up leftover whitespace / double newlines
-  out = out.replace(/\n{3,}/g, '\n\n').trim();
-
-  // If sanitization wiped everything, return a safe fallback
-  if (!out || out.length < 5) {
-    console.warn('[sanitize] reply was fully stripped — using safe fallback');
-    return "I'm here to help. What would you like to work on?";
+  out = out.replace(/\s{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+  if (out.length < 4) {
+    console.warn('[sanitize] reply fully stripped — using safe fallback');
+    return "I couldn't generate a response. Please try again.";
   }
-
   return out;
 }
 

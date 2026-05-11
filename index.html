@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -1988,13 +1988,12 @@
   let voiceOutOn    = false;  // speech synthesis toggle
   let wakeListening = false;  // wake word mode
 
-  /* ── Client-side reply sanitizer ──
-     Mirrors the backend sanitizeReply() as a second line of defence.
-     Applied before rendering, saving to Firestore, and speaking aloud.
-  ── */
+  /* -- Client-side reply sanitizer --
+     Strips system-prompt phrases that leaked into the AI reply.
+     Uses simple indexOf removal -- no regex sentence-wiping.
+  -- */
   const SANITIZE_PHRASES = [
     'You are FlowTask AI',
-    'you are flowtask ai',
     'FlowTask AI —', 'FlowTask AI -',
     'highly intelligent productivity companion',
     'intelligent, emotionally aware productivity companion',
@@ -2005,21 +2004,26 @@
     'FOLLOW-UP QUESTION EXAMPLES', 'EMOTIONAL_STATE:',
     '[Board snapshot for this session]', '[End snapshot',
     'use this context to answer naturally',
-    'system prompt', 'You help users', 'You have access to',
     'Never say "As an AI"', 'Never use markdown',
     'Respond naturally. Think before answering',
   ];
 
   function sanitizeAIReply(text) {
-    if (!text) return '';
+    if (!text || typeof text !== 'string') return '';
     let out = text;
+    // Simple literal removal -- no regex, no sentence-wiping
     for (const phrase of SANITIZE_PHRASES) {
-      const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      out = out.replace(new RegExp(`[^.!?\\n]*${escaped}[^.!?\\n]*[.!?]?`, 'gi'), '');
+      let idx = out.toLowerCase().indexOf(phrase.toLowerCase());
+      while (idx !== -1) {
+        out = out.slice(0, idx) + out.slice(idx + phrase.length);
+        idx = out.toLowerCase().indexOf(phrase.toLowerCase());
+      }
     }
-    out = out.replace(/\n{3,}/g, '\n\n').trim();
-    if (!out || out.length < 5) {
-      return "I'm here to help. What would you like to work on?";
+    out = out.replace(/\s{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+    // Only fall back if sanitization wiped everything meaningful
+    if (out.length < 4) {
+      console.warn('[sanitize] reply fully stripped, using fallback');
+      return "I couldn't generate a response. Please try again.";
     }
     return out;
   }
