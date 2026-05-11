@@ -1,18 +1,20 @@
 /**
  * POST /api/classify
  *
- * Body:   { "text": "Finished the design review" }
+ * Body:    { "text": "Finished the design review" }
  * Returns: { "title": "Design review", "category": "completed" }
  *
  * category is always one of: todo | inprogress | completed
- * Falls back to { title: text, category: "todo" } on any error.
+ * Falls back to { title: text, category: "todo" } on any error — never breaks the UI.
  */
 
-import { callAI, parseAIJson, handleCors } from './_ai.js';
+'use strict';
+
+const { callAI, parseAIJson, handleCors } = require('./_ai.js');
 
 const VALID_COLS = ['todo', 'inprogress', 'completed'];
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   // Handle CORS preflight
   if (handleCors(req, res)) return;
 
@@ -34,20 +36,20 @@ export default async function handler(req, res) {
 Task: "${input}"
 
 Classification rules:
-- "completed" → past tense actions (finished, done, completed, reviewed, shipped, fixed, wrote, built)
+- "completed" → past tense (finished, done, completed, reviewed, shipped, fixed, wrote, built, sent)
 - "inprogress" → currently happening (working on, coding, writing, building, in progress, started)
-- "todo"       → everything else (need to, should, will, plan to, upcoming)
+- "todo"       → everything else (need to, should, will, plan to, upcoming, want to)
 
-"title" must be a clean, concise rewrite of the task (max 60 characters, no quotes).
+"title" must be a clean concise rewrite of the task (max 60 chars, no surrounding quotes).
 
-Respond with ONLY this JSON object:
+Respond with ONLY this JSON — nothing else:
 {"title":"<clean task title>","category":"<todo|inprogress|completed>"}`;
 
   try {
     const raw    = await callAI(prompt, { max_tokens: 150, temperature: 0.1 });
     const parsed = parseAIJson(raw);
 
-    console.log('[classify] parsed:', parsed);
+    console.log('[classify] parsed:', JSON.stringify(parsed));
 
     const category = VALID_COLS.includes(parsed.category) ? parsed.category : 'todo';
     const title    = typeof parsed.title === 'string' && parsed.title.trim()
@@ -58,7 +60,7 @@ Respond with ONLY this JSON object:
     return res.status(200).json({ title, category });
 
   } catch (err) {
-    console.error('[classify] error — falling back to todo:', err.message);
+    console.error('[classify] error — falling back:', err.message);
     return res.status(200).json({ title: input, category: 'todo' });
   }
-}
+};

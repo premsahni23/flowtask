@@ -4,12 +4,14 @@
  * Body:    { "question": "What should I do next?", "todo": [], "inprogress": [], "completed": [] }
  * Returns: { "answer": "Focus on: ..." }
  *
- * Falls back to rule-based answers if AI fails.
+ * Falls back to rule-based answers if AI fails — never returns an error to the UI.
  */
 
-import { callAI, handleCors } from './_ai.js';
+'use strict';
 
-export default async function handler(req, res) {
+const { callAI, handleCors } = require('./_ai.js');
+
+module.exports = async function handler(req, res) {
   if (handleCors(req, res)) return;
 
   if (req.method !== 'POST') {
@@ -18,7 +20,7 @@ export default async function handler(req, res) {
 
   const {
     question,
-    todo      = [],
+    todo       = [],
     inprogress = [],
     completed  = []
   } = req.body || {};
@@ -28,10 +30,10 @@ export default async function handler(req, res) {
   }
 
   console.log('[assistant] question:', question);
-  console.log('[assistant] board state — todo:', todo.length, 'inprogress:', inprogress.length, 'completed:', completed.length);
+  console.log('[assistant] board — todo:', todo.length, 'inprogress:', inprogress.length, 'completed:', completed.length);
 
-  // Build a concise board summary for the AI
-  const fmt = (arr) => arr.length === 0 ? 'none' : arr.slice(0, 5).map(t => `"${t}"`).join(', ');
+  const fmt = arr =>
+    arr.length === 0 ? 'none' : arr.slice(0, 5).map(t => `"${t}"`).join(', ');
 
   const context = [
     `To Do (${todo.length}): ${fmt(todo)}`,
@@ -56,7 +58,7 @@ Reply in 1-2 sentences. Be direct and actionable. No markdown, no bullet points,
   } catch (err) {
     console.error('[assistant] error — using fallback:', err.message);
 
-    // Rule-based fallback so the UI never shows an error
+    // Rule-based fallback — always returns something useful
     const q = question.toLowerCase();
     let answer;
 
@@ -82,4 +84,4 @@ Reply in 1-2 sentences. Be direct and actionable. No markdown, no bullet points,
 
     return res.status(200).json({ answer });
   }
-}
+};

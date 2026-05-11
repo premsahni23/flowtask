@@ -7,17 +7,19 @@
  * Falls back to evenly-spaced times if AI fails.
  */
 
-import { callAI, parseAIJson, handleCors } from './_ai.js';
+'use strict';
 
-/** Convert 24h hour integer to 12h string, e.g. 14 → "2:00 PM" */
+const { callAI, parseAIJson, handleCors } = require('./_ai.js');
+
+/** Convert a 24h hour integer to a 12h time string. e.g. 14 → "2:00 PM" */
 function toTime(hour) {
-  const h   = hour % 24;
+  const h    = hour % 24;
   const ampm = h < 12 ? 'AM' : 'PM';
   const h12  = h === 0 ? 12 : h > 12 ? h - 12 : h;
   return `${h12}:00 ${ampm}`;
 }
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   if (handleCors(req, res)) return;
 
   if (req.method !== 'POST') {
@@ -49,7 +51,7 @@ Required format:
     const raw    = await callAI(prompt, { max_tokens: 400, temperature: 0.4 });
     const parsed = parseAIJson(raw);
 
-    console.log('[planner] parsed:', parsed);
+    console.log('[planner] parsed:', JSON.stringify(parsed));
 
     if (!Array.isArray(parsed)) {
       throw new Error('AI returned non-array: ' + typeof parsed);
@@ -66,16 +68,17 @@ Required format:
       throw new Error('AI returned empty plan array');
     }
 
-    console.log('[planner] plan:', plan);
+    console.log('[planner] plan items:', plan.length);
     return res.status(200).json({ plan });
 
   } catch (err) {
     console.error('[planner] error — using fallback schedule:', err.message);
 
-    // Fallback: split by comma and assign times starting at 9 AM, every 2 hours
+    // Fallback: split by comma, strip "plan my day:" prefix, assign times from 9 AM
     const taskList = input
+      .replace(/^plan my day[:\s]*/i, '')
       .split(',')
-      .map(t => t.replace(/^plan my day[:\s]*/i, '').trim())
+      .map(t => t.trim())
       .filter(Boolean);
 
     const plan = taskList.map((task, i) => ({
@@ -85,4 +88,4 @@ Required format:
 
     return res.status(200).json({ plan });
   }
-}
+};

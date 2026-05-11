@@ -1,24 +1,19 @@
 {
   "version": 2,
-  "functions": {
-    "api/**/*.js": {
-      "runtime": "nodejs20.x"
-    }
-  },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/sw.js",    "destination": "/sw.js" },
-    { "source": "/manifest.json", "destination": "/manifest.json" },
-    { "source": "/icons/(.*)", "destination": "/icons/$1" },
-    { "source": "/(.*)",     "destination": "/index.html" }
+    { "source": "/sw.js",           "destination": "/sw.js" },
+    { "source": "/manifest.json",   "destination": "/manifest.json" },
+    { "source": "/icons/(.*)",      "destination": "/icons/$1" },
+    { "source": "/(.*)",            "destination": "/index.html" }
   ],
   "headers": [
     {
       "source": "/sw.js",
       "headers": [
-        { "key": "Cache-Control",        "value": "no-cache, no-store, must-revalidate" },
+        { "key": "Cache-Control",         "value": "no-cache, no-store, must-revalidate" },
         { "key": "Service-Worker-Allowed","value": "/" },
-        { "key": "Content-Type",         "value": "application/javascript" }
+        { "key": "Content-Type",          "value": "application/javascript" }
       ]
     },
     {
@@ -38,7 +33,7 @@
       "source": "/api/(.*)",
       "headers": [
         { "key": "Access-Control-Allow-Origin",  "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "POST, OPTIONS" },
+        { "key": "Access-Control-Allow-Methods", "value": "POST, GET, OPTIONS" },
         { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
       ]
     }
