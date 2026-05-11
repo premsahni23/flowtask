@@ -911,6 +911,170 @@
   .ft-assistant, .ft-planner { padding: 14px 16px; margin-bottom: 16px; }
   .ft-assistant-input, .ft-planner-input { font-size: 15px; }
 }
+
+/* ── Conversation history ── */
+.ft-chat-history {
+  max-height: 280px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding-right: 2px;
+  scroll-behavior: smooth;
+}
+
+.ft-chat-history::-webkit-scrollbar { width: 3px; }
+.ft-chat-history::-webkit-scrollbar-track { background: transparent; }
+.ft-chat-history::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 99px; }
+
+.ft-chat-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: card-in 0.25s ease;
+}
+
+.ft-chat-msg.user  { align-items: flex-end; }
+.ft-chat-msg.ai    { align-items: flex-start; }
+
+.ft-chat-bubble {
+  max-width: 88%;
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.ft-chat-msg.user .ft-chat-bubble {
+  background: rgba(99,51,255,0.2);
+  border: 1px solid rgba(99,51,255,0.3);
+  color: #c4b5fd;
+  border-bottom-right-radius: 4px;
+}
+
+.ft-chat-msg.ai .ft-chat-bubble {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: #cbd5e1;
+  border-bottom-left-radius: 4px;
+}
+
+.ft-chat-meta {
+  font-size: 10px;
+  color: #334155;
+  padding: 0 4px;
+}
+
+/* ── AI thinking animation ── */
+.ft-thinking {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+  border-bottom-left-radius: 4px;
+  width: fit-content;
+  margin-bottom: 4px;
+}
+
+.ft-thinking.visible { display: flex; }
+
+.ft-thinking-label {
+  font-size: 11px;
+  color: #475569;
+  font-style: italic;
+}
+
+.ft-thinking-dots {
+  display: flex;
+  gap: 3px;
+}
+
+.ft-thinking-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: #6333ff;
+  animation: thinking-bounce 1.2s ease-in-out infinite;
+}
+
+.ft-thinking-dot:nth-child(2) { animation-delay: 0.2s; }
+.ft-thinking-dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes thinking-bounce {
+  0%, 100% { transform: translateY(0); opacity: 0.4; }
+  50%       { transform: translateY(-4px); opacity: 1; }
+}
+
+/* ── Assistant header controls ── */
+.ft-assistant-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ft-voice-out-btn {
+  width: 28px; height: 28px;
+  border-radius: 8px; border: none;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: #64748b; cursor: pointer;
+  font-size: 13px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+}
+
+.ft-voice-out-btn:hover  { background: rgba(99,51,255,0.15); color: #a78bfa; }
+.ft-voice-out-btn.active { background: rgba(99,51,255,0.2); color: #a78bfa; border-color: rgba(99,51,255,0.4); }
+
+.ft-clear-chat-btn {
+  font-size: 10px; color: #334155; cursor: pointer;
+  background: none; border: none;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  padding: 2px 6px; border-radius: 4px;
+  transition: color 0.15s;
+}
+
+.ft-clear-chat-btn:hover { color: #64748b; }
+
+/* ── Wake word indicator ── */
+.ft-wake-indicator {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #34d399;
+  padding: 4px 10px;
+  background: rgba(16,185,129,0.08);
+  border: 1px solid rgba(16,185,129,0.2);
+  border-radius: 20px;
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 250;
+  white-space: nowrap;
+}
+
+.ft-wake-indicator.visible { display: flex; }
+.ft-wake-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #10b981;
+  animation: pulse-dot 1s ease-in-out infinite;
+}
+
+/* ── Assistant empty state ── */
+.ft-chat-empty {
+  text-align: center;
+  padding: 20px 10px;
+  color: #334155;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.ft-chat-empty-icon { font-size: 28px; margin-bottom: 6px; }
 </style>
 
 <!-- ── Auth overlay (shown until user signs in) ── -->
@@ -1001,25 +1165,59 @@
     <div class="ft-assistant" id="assistant-panel" style="display:none;">
       <div class="ft-assistant-header">
         <div class="ft-assistant-title">
-          <span>✦</span> AI Assistant
+          <span>✦</span> FlowTask AI
+        </div>
+        <div class="ft-assistant-controls">
+          <!-- Voice output toggle -->
+          <button class="ft-voice-out-btn" id="voice-out-btn" title="Toggle voice output">🔇</button>
+          <button class="ft-clear-chat-btn" id="clear-chat-btn" title="Clear conversation">Clear</button>
         </div>
       </div>
+
+      <!-- Conversation history -->
+      <div class="ft-chat-history" id="chat-history">
+        <div class="ft-chat-empty" id="chat-empty">
+          <div class="ft-chat-empty-icon">✦</div>
+          Ask me anything about your tasks,<br>your day, or what to focus on next.
+        </div>
+      </div>
+
+      <!-- AI thinking indicator -->
+      <div class="ft-thinking" id="ai-thinking">
+        <div class="ft-thinking-dots">
+          <div class="ft-thinking-dot"></div>
+          <div class="ft-thinking-dot"></div>
+          <div class="ft-thinking-dot"></div>
+        </div>
+        <span class="ft-thinking-label">FlowTask AI is thinking…</span>
+      </div>
+
+      <!-- Input row -->
       <div class="ft-assistant-body">
         <input
           class="ft-assistant-input"
           id="assistant-input"
-          placeholder="Ask anything… e.g. What should I do next?"
-          maxlength="200"
+          placeholder="Ask anything…"
+          maxlength="300"
           autocomplete="off"
         />
-        <button class="ft-assistant-ask-btn" id="assistant-ask-btn">Ask AI</button>
+        <button class="ft-assistant-ask-btn" id="assistant-ask-btn">Send</button>
       </div>
+
+      <!-- Quick suggestion chips -->
       <div class="ft-assistant-quick">
-        <span class="ft-assistant-chip" onclick="askAssistant('What should I do next?')">What should I do next?</span>
-        <span class="ft-assistant-chip" onclick="askAssistant('What did I complete today?')">What did I complete today?</span>
-        <span class="ft-assistant-chip" onclick="askAssistant('How am I doing?')">How am I doing?</span>
+        <span class="ft-assistant-chip" onclick="askAssistant('What should I do next?')">What's next?</span>
+        <span class="ft-assistant-chip" onclick="askAssistant('How am I doing today?')">My progress</span>
+        <span class="ft-assistant-chip" onclick="askAssistant('I feel overwhelmed, help me focus')">Help me focus</span>
+        <span class="ft-assistant-chip" onclick="askAssistant('Should I take a break?')">Need a break?</span>
+        <span class="ft-assistant-chip" onclick="askAssistant('What did I complete today?')">Done today</span>
       </div>
-      <div class="ft-assistant-answer" id="assistant-answer"></div>
+    </div>
+
+    <!-- Wake word indicator (shown when listening for "Hey FlowTask") -->
+    <div class="ft-wake-indicator" id="wake-indicator">
+      <div class="ft-wake-dot"></div>
+      Listening for "Hey FlowTask"…
     </div>
 
     <!-- ── AI Daily Planner panel ── -->
@@ -1176,10 +1374,15 @@
   const progressWrap  = document.getElementById('progress-wrap');
   const progressFill  = document.getElementById('progress-fill');
   const progressPct   = document.getElementById('progress-pct');
-  const assistantPanel = document.getElementById('assistant-panel');
-  const assistantInput = document.getElementById('assistant-input');
+  const assistantPanel  = document.getElementById('assistant-panel');
+  const assistantInput  = document.getElementById('assistant-input');
   const assistantAskBtn = document.getElementById('assistant-ask-btn');
-  const assistantAnswer = document.getElementById('assistant-answer');
+  const chatHistory     = document.getElementById('chat-history');
+  const chatEmpty       = document.getElementById('chat-empty');
+  const aiThinking      = document.getElementById('ai-thinking');
+  const voiceOutBtn     = document.getElementById('voice-out-btn');
+  const clearChatBtn    = document.getElementById('clear-chat-btn');
+  const wakeIndicator   = document.getElementById('wake-indicator');
   const plannerPanel  = document.getElementById('planner-panel');
   const plannerInput  = document.getElementById('planner-input');
   const plannerBtn    = document.getElementById('planner-btn');
@@ -1297,8 +1500,12 @@
 
     // Start real-time Firestore sync
     subscribeToTasks(user.uid);
+    // Load conversation history from Firestore
+    loadChatHistory(user.uid);
     // Start 30-min reminder loop
     startReminders();
+    // Start wake word listener
+    startWakeWordListener();
     showToast(`Welcome back, ${user.displayName?.split(' ')[0] || 'there'} 👋`);
   }
 
@@ -1313,6 +1520,10 @@
     assistantPanel.style.display = 'none';
     plannerPanel.style.display   = 'none';
     stopReminders();
+    // Clear chat state on sign-out
+    chatLog = [];
+    wakeListening = false;
+    window.speechSynthesis?.cancel();
     clearBoard();
   }
 
@@ -1764,52 +1975,229 @@
   taskInput.addEventListener('blur',  () => inputBar.classList.remove('focused'));
 
   /* ─────────────────────────────────────────────
-     AI ASSISTANT
-     Sends the user's question + current board
-     state to /api/assistant and shows the answer.
+     CONVERSATIONAL AI ASSISTANT
+     Full Jarvis-style assistant with:
+     - Conversation memory (Firestore + in-memory)
+     - System personality via /api/assistant
+     - Speech synthesis output
+     - Wake word detection ("Hey FlowTask")
   ───────────────────────────────────────────── */
 
+  // In-memory conversation history: [{ role, content, ts }]
+  let chatLog       = [];
+  let voiceOutOn    = false;  // speech synthesis toggle
+  let wakeListening = false;  // wake word mode
+
+  /* ── Render a message bubble into the chat history ── */
+  function appendChatBubble(role, text, animate = true) {
+    // Hide empty state
+    if (chatEmpty) chatEmpty.style.display = 'none';
+
+    const wrap = document.createElement('div');
+    wrap.className = `ft-chat-msg ${role}`;
+    if (!animate) wrap.style.animation = 'none';
+
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    wrap.innerHTML = `
+      <div class="ft-chat-bubble">${escapeHtml(text)}</div>
+      <div class="ft-chat-meta">${role === 'user' ? 'You' : 'FlowTask AI'} · ${now}</div>`;
+
+    chatHistory.appendChild(wrap);
+    // Scroll to bottom
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+  }
+
+  /* ── Save conversation to Firestore for persistence ── */
+  async function saveChatToFirestore(role, content) {
+    if (!currentUser) return;
+    try {
+      await db.collection('assistant_messages').add({
+        userId:    currentUser.uid,
+        role,
+        message:   content,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    } catch (e) {
+      // Non-fatal — chat still works without persistence
+      console.warn('[chat] Firestore save failed:', e.message);
+    }
+  }
+
+  /* ── Load last 10 messages from Firestore on sign-in ── */
+  async function loadChatHistory(uid) {
+    try {
+      const snap = await db.collection('assistant_messages')
+        .where('userId', '==', uid)
+        .orderBy('timestamp', 'desc')
+        .limit(10)
+        .get();
+
+      if (snap.empty) return;
+
+      // Reverse to chronological order
+      const msgs = [];
+      snap.forEach(doc => msgs.unshift(doc.data()));
+
+      msgs.forEach(m => {
+        chatLog.push({ role: m.role, content: m.message });
+        appendChatBubble(m.role, m.message, false);
+      });
+    } catch (e) {
+      // Index may not exist yet — silently skip
+      console.warn('[chat] history load failed:', e.message);
+    }
+  }
+
+  /* ── Speak text aloud using Web Speech API ── */
+  function speakResponse(text) {
+    if (!voiceOutOn || !window.speechSynthesis) return;
+    // Cancel any ongoing speech
+    window.speechSynthesis.cancel();
+    const utt  = new SpeechSynthesisUtterance(text);
+    utt.rate   = 1.05;
+    utt.pitch  = 1.0;
+    utt.volume = 1.0;
+    // Prefer a natural-sounding voice
+    const voices = window.speechSynthesis.getVoices();
+    const preferred = voices.find(v =>
+      v.name.includes('Google') || v.name.includes('Samantha') || v.name.includes('Karen')
+    );
+    if (preferred) utt.voice = preferred;
+    window.speechSynthesis.speak(utt);
+  }
+
+  /* ── Main send function ── */
   async function askAssistant(question) {
-    const q = question || assistantInput.value.trim();
+    const q = (question || assistantInput.value).trim();
     if (!q) return;
 
     assistantInput.value = '';
     assistantAskBtn.disabled = true;
-    assistantAnswer.textContent = '✦ Thinking…';
-    assistantAnswer.classList.add('visible');
 
-    // Build board context from taskCache
-    const tasks     = Object.values(taskCache);
-    const todo      = tasks.filter(t => t.col === 'todo').map(t => t.text);
+    // Add user message to UI + memory
+    appendChatBubble('user', q);
+    chatLog.push({ role: 'user', content: q });
+    saveChatToFirestore('user', q);
+
+    // Show thinking indicator
+    aiThinking.classList.add('visible');
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+
+    // Build board context
+    const tasks      = Object.values(taskCache);
+    const todo       = tasks.filter(t => t.col === 'todo').map(t => t.text);
     const inprogress = tasks.filter(t => t.col === 'inprogress').map(t => t.text);
-    const completed = tasks.filter(t => t.col === 'completed').map(t => t.text);
+    const completed  = tasks.filter(t => t.col === 'completed').map(t => t.text);
 
+    // Send last 10 turns as history (exclude current message — it's in `message`)
+    const history = chatLog.slice(-11, -1);
+
+    let answer;
     try {
       const res  = await fetch('/api/assistant', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ question: q, todo, inprogress, completed })
+        body:    JSON.stringify({ message: q, history, todo, inprogress, completed })
       });
       const data = await res.json();
-      assistantAnswer.textContent = data.answer || 'No answer returned.';
+      answer = data.answer || "I'm not sure how to answer that. Try rephrasing?";
     } catch (err) {
-      // Client-side fallback if API is unreachable
+      console.warn('[assistant] fetch failed:', err.message);
+      // Client-side fallback
       if (inprogress.length > 0) {
-        assistantAnswer.textContent = `Focus on: "${inprogress[0]}"`;
+        answer = `Keep going on "${inprogress[0]}" — you've already started it.`;
       } else if (todo.length > 0) {
-        assistantAnswer.textContent = `Start with: "${todo[0]}"`;
+        answer = `Start with "${todo[0]}" — it's first on your list.`;
       } else {
-        assistantAnswer.textContent = "You're all caught up! Add a new task.";
+        answer = "Your board is clear. Add a new task and let's get moving!";
       }
     } finally {
+      aiThinking.classList.remove('visible');
       assistantAskBtn.disabled = false;
     }
+
+    // Add AI response to UI + memory
+    appendChatBubble('ai', answer);
+    chatLog.push({ role: 'assistant', content: answer });
+    saveChatToFirestore('assistant', answer);
+
+    // Speak the response if voice output is on
+    speakResponse(answer);
   }
 
+  /* ── Voice output toggle ── */
+  voiceOutBtn.addEventListener('click', () => {
+    voiceOutOn = !voiceOutOn;
+    voiceOutBtn.textContent = voiceOutOn ? '🔊' : '🔇';
+    voiceOutBtn.classList.toggle('active', voiceOutOn);
+    voiceOutBtn.title = voiceOutOn ? 'Voice output on — click to mute' : 'Voice output off — click to unmute';
+    showToast(voiceOutOn ? 'Voice output on 🔊' : 'Voice output off 🔇');
+    if (!voiceOutOn) window.speechSynthesis?.cancel();
+  });
+
+  /* ── Clear conversation ── */
+  clearChatBtn.addEventListener('click', () => {
+    chatLog = [];
+    // Remove all bubbles, show empty state
+    Array.from(chatHistory.querySelectorAll('.ft-chat-msg')).forEach(el => el.remove());
+    if (chatEmpty) chatEmpty.style.display = 'block';
+    window.speechSynthesis?.cancel();
+  });
+
+  /* ── Input events ── */
   assistantAskBtn.addEventListener('click', () => askAssistant());
   assistantInput.addEventListener('keydown', e => {
     if (e.key === 'Enter') askAssistant();
   });
+
+  /* ── Wake word detection: "Hey FlowTask" ──
+     Basic implementation — listens continuously in background.
+     Activates the assistant input when trigger phrase is heard.
+  ── */
+  function startWakeWordListener() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR || wakeListening) return;
+
+    const wake = new SR();
+    wake.continuous    = true;
+    wake.interimResults = true;
+    wake.lang          = 'en-US';
+    wakeListening      = true;
+
+    wake.onresult = e => {
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const transcript = e.results[i][0].transcript.toLowerCase().trim();
+        if (transcript.includes('hey flowtask') || transcript.includes('hey flow task')) {
+          wakeIndicator.classList.add('visible');
+          setTimeout(() => wakeIndicator.classList.remove('visible'), 3000);
+          // Focus the assistant input
+          assistantInput.focus();
+          assistantPanel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          showToast('FlowTask AI is listening…', '✦');
+          break;
+        }
+      }
+    };
+
+    wake.onend = () => {
+      // Restart automatically to keep listening
+      wakeListening = false;
+      if (currentUser) {
+        setTimeout(startWakeWordListener, 1000);
+      }
+    };
+
+    wake.onerror = () => {
+      wakeListening = false;
+    };
+
+    try {
+      wake.start();
+    } catch (e) {
+      wakeListening = false;
+    }
+  }
 
   /* ─────────────────────────────────────────────
      AI DAILY PLANNER
@@ -1888,14 +2276,14 @@
 
   /* ─────────────────────────────────────────────
      SMART REMINDERS
-     Every 30 minutes, show a toast based on the
-     current board state. Stops on sign-out.
+     Every 30 minutes, fires a context-aware toast
+     and optionally speaks it aloud.
   ───────────────────────────────────────────── */
 
   let reminderInterval = null;
 
   function startReminders() {
-    stopReminders(); // clear any existing interval first
+    stopReminders();
     reminderInterval = setInterval(fireReminder, 30 * 60 * 1000);
   }
 
@@ -1911,21 +2299,29 @@
     const pending    = tasks.filter(t => t.col === 'todo');
     const inprogress = tasks.filter(t => t.col === 'inprogress');
     const completed  = tasks.filter(t => t.col === 'completed');
+    const total      = tasks.length;
+    const pct        = total > 0 ? Math.round((completed.length / total) * 100) : 0;
+
+    if (total === 0) return;
 
     let msg, icon;
 
-    if (tasks.length === 0) return; // nothing to remind about
-
-    if (inprogress.length > 0) {
-      msg  = `Still working on "${inprogress[0].text}"? Keep going! 💪`;
+    if (inprogress.length > 3) {
+      msg  = `⚠️ You have ${inprogress.length} tasks in progress. Finish one before starting another.`;
+      icon = '⚠️';
+    } else if (inprogress.length > 0) {
+      msg  = `Still working on "${inprogress[0].text}"? Keep going — you're making progress! 💪`;
       icon = '⏱';
+    } else if (pending.length > 6) {
+      msg  = `You have ${pending.length} pending tasks. Pick just ONE and start it now. 🎯`;
+      icon = '🔔';
     } else if (pending.length > 0) {
       msg  = pending.length === 1
-        ? `Time to start: "${pending[0].text}"`
-        : `You have ${pending.length} pending tasks. Pick one and start. 🚀`;
+        ? `One task left: "${pending[0].text}". Let's finish strong! 🚀`
+        : `${pending.length} tasks waiting. Time to pick one and move it forward.`;
       icon = '🔔';
-    } else if (completed.length === tasks.length) {
-      msg  = "Everything done! 🎉 Great work today.";
+    } else if (pct === 100) {
+      msg  = "Everything done! 🎉 Incredible work today.";
       icon = '✅';
     } else {
       msg  = "Check your board — any tasks to move forward?";
@@ -1933,6 +2329,7 @@
     }
 
     showToast(msg, icon);
+    speakResponse(msg.replace(/[⚠️🎯🔔🚀✅📋⏱💪🎉]/g, '').trim());
   }
 </script>
 </body>
