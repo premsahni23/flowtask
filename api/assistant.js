@@ -15,7 +15,7 @@
 
 'use strict';
 
-const { handleCors } = require('./_ai.js');
+const { handleCors, parseBody } = require('./_ai.js');
 
 // ── Models to try in order (first available free model wins) ─────────────────
 // meta-llama/llama-3.1-8b-instruct:free is the most reliable free model on OpenRouter
@@ -158,26 +158,32 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const {
-    message,
-    history    = [],
-    todo       = [],
-    inprogress = [],
-    completed  = []
-  } = req.body || {};
+  // Parse body — handles both auto-parsed objects and raw streams
+  const body = await parseBody(req);
 
-  if (!message || typeof message !== 'string' || !message.trim()) {
-    return res.status(400).json({ error: '"message" field is required' });
+  console.log('[assistant] ── new request ──');
+  console.log('[assistant] raw body keys:', Object.keys(body));
+
+  // Accept both `message` and `text` field names for compatibility
+  const userMessage = (body.message || body.text || '').trim();
+  const history     = Array.isArray(body.history)    ? body.history    : [];
+  const todo        = Array.isArray(body.todo)        ? body.todo        : [];
+  const inprogress  = Array.isArray(body.inprogress)  ? body.inprogress  : [];
+  const completed   = Array.isArray(body.completed)   ? body.completed   : [];
+
+  console.log('[assistant] userMessage:', userMessage.slice(0, 120));
+  console.log('[assistant] history turns:', history.length);
+  console.log('[assistant] board — todo:', todo.length, 'inprogress:', inprogress.length, 'completed:', completed.length);
+
+  if (!userMessage) {
+    console.error('[assistant] 400 — no message in body:', JSON.stringify(body).slice(0, 200));
+    return res.status(400).json({ error: 'message is required', received: Object.keys(body) });
   }
 
-  const input  = message.trim();
+  const input  = userMessage;
   const apiKey = process.env.OPENROUTER_API_KEY;
   const appUrl = process.env.APP_URL || 'https://flowtask.vercel.app';
 
-  console.log('[assistant] ── new request ──');
-  console.log('[assistant] message:', input.slice(0, 120));
-  console.log('[assistant] history turns:', history.length);
-  console.log('[assistant] board — todo:', todo.length, 'inprogress:', inprogress.length, 'completed:', completed.length);
   console.log('[assistant] API key set:', !!apiKey);
   console.log('[assistant] APP_URL:', appUrl);
 

@@ -9,7 +9,7 @@
 
 'use strict';
 
-const { callAI, parseAIJson, handleCors } = require('./_ai.js');
+const { callAI, parseAIJson, handleCors, parseBody } = require('./_ai.js');
 
 /** Convert a 24h hour integer to a 12h time string. e.g. 14 → "2:00 PM" */
 function toTime(hour) {
@@ -26,7 +26,8 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { tasks } = req.body || {};
+  const body    = await parseBody(req);
+  const { tasks } = body;
 
   if (!tasks || typeof tasks !== 'string' || !tasks.trim()) {
     return res.status(400).json({ error: '"tasks" field is required' });

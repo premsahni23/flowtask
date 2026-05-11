@@ -6,6 +6,34 @@
 'use strict';
 
 /**
+ * Reliably parse the request body as JSON.
+ * @vercel/node auto-parses when Content-Type is application/json,
+ * but falls back to a raw Buffer in some runtime versions.
+ * This handles both cases.
+ * @returns {Promise<object>}
+ */
+async function parseBody(req) {
+  // Already parsed by the runtime (most common case)
+  if (req.body && typeof req.body === 'object') {
+    return req.body;
+  }
+
+  // Raw buffer / stream — read and parse manually
+  return new Promise((resolve) => {
+    let raw = '';
+    req.on('data', chunk => { raw += chunk.toString(); });
+    req.on('end', () => {
+      try {
+        resolve(raw ? JSON.parse(raw) : {});
+      } catch {
+        resolve({});
+      }
+    });
+    req.on('error', () => resolve({}));
+  });
+}
+
+/**
  * Send a prompt to OpenRouter and return the raw text response.
  * @param {string} prompt
  * @param {object} opts  - optional: model, max_tokens, temperature
@@ -112,4 +140,4 @@ function handleCors(req, res) {
   return false;
 }
 
-module.exports = { callAI, parseAIJson, handleCors };
+module.exports = { callAI, parseAIJson, handleCors, parseBody };

@@ -10,7 +10,7 @@
 
 'use strict';
 
-const { callAI, parseAIJson, handleCors } = require('./_ai.js');
+const { callAI, parseAIJson, handleCors, parseBody } = require('./_ai.js');
 
 const VALID_COLS = ['todo', 'inprogress', 'completed'];
 
@@ -22,7 +22,8 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { text } = req.body || {};
+  const body  = await parseBody(req);
+  const { text } = body;
 
   if (!text || typeof text !== 'string' || !text.trim()) {
     return res.status(400).json({ error: '"text" field is required' });
