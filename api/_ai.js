@@ -7,29 +7,69 @@
 
 /**
  * Reliably parse the request body as JSON.
- * @vercel/node auto-parses when Content-Type is application/json,
- * but falls back to a raw Buffer in some runtime versions.
- * This handles both cases.
+ *
+ * Vercel's @vercel/node runtime can deliver req.body as:
+ *   1. A plain object  — already parsed (happy path)
+ *   2. A Buffer        — needs toString() + JSON.parse
+ *   3. A string        — needs JSON.parse
+ *   4. undefined/null  — needs stream reading
+ *
  * @returns {Promise<object>}
  */
 async function parseBody(req) {
-  // Already parsed by the runtime (most common case)
-  if (req.body && typeof req.body === 'object') {
-    return req.body;
+  const b = req.body;
+
+  // Case 1: already a plain object (not a Buffer, not null)
+  if (b && typeof b === 'object' && !Buffer.isBuffer(b) && !Array.isArray(b)) {
+    console.log('[parseBody] pre-parsed object, keys:', Object.keys(b));
+    return b;
   }
 
-  // Raw buffer / stream — read and parse manually
+  // Case 2: Buffer
+  if (Buffer.isBuffer(b)) {
+    try {
+      const parsed = JSON.parse(b.toString('utf8'));
+      console.log('[parseBody] parsed from Buffer, keys:', Object.keys(parsed));
+      return parsed;
+    } catch (e) {
+      console.error('[parseBody] Buffer parse failed:', e.message);
+      return {};
+    }
+  }
+
+  // Case 3: already a string
+  if (typeof b === 'string' && b.trim()) {
+    try {
+      const parsed = JSON.parse(b);
+      console.log('[parseBody] parsed from string, keys:', Object.keys(parsed));
+      return parsed;
+    } catch (e) {
+      console.error('[parseBody] string parse failed:', e.message);
+      return {};
+    }
+  }
+
+  // Case 4: raw stream (req.body is undefined/null)
+  console.log('[parseBody] reading raw stream...');
   return new Promise((resolve) => {
-    let raw = '';
-    req.on('data', chunk => { raw += chunk.toString(); });
+    const chunks = [];
+    req.on('data', chunk => chunks.push(chunk));
     req.on('end', () => {
+      const raw = Buffer.concat(chunks).toString('utf8');
+      console.log('[parseBody] stream raw length:', raw.length);
       try {
-        resolve(raw ? JSON.parse(raw) : {});
-      } catch {
+        const parsed = raw ? JSON.parse(raw) : {};
+        console.log('[parseBody] stream parsed, keys:', Object.keys(parsed));
+        resolve(parsed);
+      } catch (e) {
+        console.error('[parseBody] stream parse failed:', e.message, '| raw:', raw.slice(0, 100));
         resolve({});
       }
     });
-    req.on('error', () => resolve({}));
+    req.on('error', (e) => {
+      console.error('[parseBody] stream error:', e.message);
+      resolve({});
+    });
   });
 }
 

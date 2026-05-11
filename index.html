@@ -2084,25 +2084,30 @@
     aiThinking.classList.add('visible');
     chatHistory.scrollTop = chatHistory.scrollHeight;
 
-    // Build board context
+    // Build board context from live taskCache
     const tasks      = Object.values(taskCache);
     const todo       = tasks.filter(t => t.col === 'todo').map(t => t.text);
     const inprogress = tasks.filter(t => t.col === 'inprogress').map(t => t.text);
     const completed  = tasks.filter(t => t.col === 'completed').map(t => t.text);
 
-    // Send last 20 turns as history for deeper conversational memory
+    // Last 20 turns of conversation history
     const history = chatLog.slice(-21, -1);
 
+    // ── Request payload — always uses "message" field ──
+    const payload = { message: q, history, todo, inprogress, completed };
+    console.log('[assistant] sending request:', { message: q.slice(0, 80), historyTurns: history.length, todo: todo.length, inprogress: inprogress.length, completed: completed.length });
+
     let answer;
-    const q_ref = q; // expose to catch block scope
     try {
-      const res  = await fetch('/api/assistant', {
+      const res = await fetch('/api/assistant', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ message: q, history, todo, inprogress, completed })
+        body:    JSON.stringify(payload)
       });
 
-      // Guard against non-JSON responses (e.g. Vercel 500 HTML page)
+      console.log('[assistant] HTTP status:', res.status);
+
+      // Guard against non-JSON (e.g. Vercel 500 HTML error page)
       const contentType = res.headers.get('content-type') || '';
       if (!contentType.includes('application/json')) {
         throw new Error(`Non-JSON response (HTTP ${res.status})`);
@@ -2111,22 +2116,26 @@
       const data = await res.json();
       console.log('[assistant] response:', data);
 
-      // Accept both `reply` (new) and `answer` (legacy) field names
-      answer = data.reply || data.answer || '';
+      // Read `reply` (canonical) with `answer` as legacy fallback
+      answer = (data.reply || data.answer || '').trim();
 
-      if (!answer) {
-        throw new Error('Empty reply from server');
-      }
+      if (!answer) throw new Error('Empty reply from server');
+
     } catch (err) {
       console.warn('[assistant] fetch failed:', err.message);
-      // Client-side fallback — varied, emotionally aware, never robotic
-      const q = q_ref.toLowerCase();
-      if (/overwhelm|stressed|too much/.test(q)) {
+
+      // Client-side fallback — emotionally aware, varied, never robotic
+      const ql = q.toLowerCase();
+      if (/overwhelm|stressed|too much|anxious/.test(ql)) {
         answer = inprogress.length > 0
-          ? `That's a lot. Just stay with "${inprogress[0]}" for now — everything else can wait.`
+          ? `That's a lot to carry. Just stay with "${inprogress[0]}" for now — everything else can wait.`
           : "Take a breath. Let's pick just one thing and ignore the rest for now.";
-      } else if (/tired|exhausted|drained/.test(q)) {
-        answer = "Rest is productive too. Even a short break resets your focus more than pushing through.";
+      } else if (/tired|exhausted|drained|burnt/.test(ql)) {
+        answer = "Rest is productive too. Even a short break resets your focus more than pushing through tired.";
+      } else if (/stuck|blocked|don't know|not sure/.test(ql)) {
+        answer = inprogress.length > 0
+          ? `What's blocking you on "${inprogress[0]}"? Sometimes naming it is half the solution.`
+          : "What's the smallest possible next step you could take right now?";
       } else if (inprogress.length > 0) {
         const opts = [
           `"${inprogress[0]}" is already in motion — finishing it will feel great.`,
@@ -2136,9 +2145,9 @@
         answer = opts[Math.floor(Math.random() * opts.length)];
       } else if (todo.length > 0) {
         const opts = [
-          `"${todo[0]}" is waiting at the top of your list.`,
+          `"${todo[0]}" is waiting at the top of your list — a good place to begin.`,
           `How about tackling "${todo[0]}" next?`,
-          `"${todo[0]}" looks like a solid next move.`
+          `"${todo[0]}" looks like a solid next move. What do you think?`
         ];
         answer = opts[Math.floor(Math.random() * opts.length)];
       } else {

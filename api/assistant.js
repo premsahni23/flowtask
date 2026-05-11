@@ -216,46 +216,62 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // ── Parse body with full debug logging ──
   const body = await parseBody(req);
 
-  console.log('[assistant] ── request ──');
-  console.log('[assistant] body keys:', Object.keys(body));
+  console.log('[assistant] ── incoming request ──');
+  console.log('[assistant] body type:', typeof body, '| is Buffer:', Buffer.isBuffer(body));
+  console.log('[assistant] body:', JSON.stringify(body).slice(0, 300));
 
-  const userMessage = (body.message || body.text || '').trim();
-  const history     = Array.isArray(body.history)   ? body.history   : [];
-  const todo        = Array.isArray(body.todo)       ? body.todo       : [];
-  const inprogress  = Array.isArray(body.inprogress) ? body.inprogress : [];
-  const completed   = Array.isArray(body.completed)  ? body.completed  : [];
+  // Accept message, text, prompt, or query — never 400 on field name mismatch
+  const userMessage = (
+    body.message ||
+    body.text    ||
+    body.prompt  ||
+    body.query   ||
+    ''
+  ).trim();
 
-  console.log('[assistant] message:', userMessage.slice(0, 120));
-  console.log('[assistant] history:', history.length, 'turns | board:', todo.length, 'todo,', inprogress.length, 'active,', completed.length, 'done');
+  const history    = Array.isArray(body.history)   ? body.history   : [];
+  const todo       = Array.isArray(body.todo)       ? body.todo       : [];
+  const inprogress = Array.isArray(body.inprogress) ? body.inprogress : [];
+  const completed  = Array.isArray(body.completed)  ? body.completed  : [];
 
+  console.log('[assistant] userMessage:', userMessage.slice(0, 120));
+  console.log('[assistant] history turns:', history.length);
+  console.log('[assistant] board — todo:', todo.length, '| inprogress:', inprogress.length, '| completed:', completed.length);
+
+  // If message is empty, return a helpful fallback instead of 400
+  // so the UI never shows an error state
   if (!userMessage) {
-    console.error('[assistant] 400 — empty message. body:', JSON.stringify(body).slice(0, 200));
-    return res.status(400).json({ error: 'message is required', received: Object.keys(body) });
+    console.warn('[assistant] empty message — returning prompt instead of 400');
+    return res.status(200).json({
+      reply:  "What's on your mind? Ask me anything about your tasks or your day.",
+      answer: "What's on your mind? Ask me anything about your tasks or your day."
+    });
   }
 
   const apiKey = process.env.OPENROUTER_API_KEY;
   const appUrl = process.env.APP_URL || 'https://flowtask.vercel.app';
 
   console.log('[assistant] API key set:', !!apiKey);
+  console.log('[assistant] APP_URL:', appUrl);
 
+  // No API key — return intelligent fallback, never an error
   if (!apiKey) {
-    console.error('[assistant] OPENROUTER_API_KEY not set');
+    console.error('[assistant] OPENROUTER_API_KEY not set — using fallback');
     const reply = buildFallback(userMessage, todo, inprogress, completed, history);
     return res.status(200).json({ reply, answer: reply });
   }
 
   // Build the full messages array for the API call
-  const systemPrompt   = buildSystemPrompt(todo, inprogress, completed, history, userMessage);
-  const contextPrimer  = buildContextPrimer(todo, inprogress, completed);
+  const systemPrompt  = buildSystemPrompt(todo, inprogress, completed, history, userMessage);
+  const contextPrimer = buildContextPrimer(todo, inprogress, completed);
 
   const messages = [
     { role: 'system', content: systemPrompt },
-    // Inject board context as a primed exchange so models ignoring system role still get it
     { role: 'user',      content: contextPrimer },
-    { role: 'assistant', content: 'Got it — I have your full context and I\'m ready.' },
-    // Last 16 turns of conversation history for deep memory
+    { role: 'assistant', content: "Got it — I have your full context and I'm ready." },
     ...history.slice(-16).map(h => ({
       role:    h.role === 'assistant' ? 'assistant' : 'user',
       content: String(h.content || '').slice(0, 500)
@@ -265,8 +281,10 @@ module.exports = async function handler(req, res) {
 
   try {
     const reply = await callOpenRouter(messages, apiKey, appUrl);
+    console.log('[assistant] final reply:', reply.slice(0, 120));
     return res.status(200).json({ reply, answer: reply });
   } catch (err) {
+    // OpenRouter failed — return fallback, never a 4xx/5xx
     console.error('[assistant] all models failed:', err.message);
     const reply = buildFallback(userMessage, todo, inprogress, completed, history);
     return res.status(200).json({ reply, answer: reply });
