@@ -1,90 +1,64 @@
 /**
- * /api/classify
- * Classifies a task using OpenRouter AI and returns:
- * { title: string, category: "todo" | "inprogress" | "completed" }
+ * POST /api/classify
+ *
+ * Body:   { "text": "Finished the design review" }
+ * Returns: { "title": "Design review", "category": "completed" }
+ *
+ * category is always one of: todo | inprogress | completed
+ * Falls back to { title: text, category: "todo" } on any error.
  */
 
-// Reusable OpenRouter caller — used by all AI endpoints
-async function callAI(prompt) {
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://flowtask.vercel.app',
-      'X-Title': 'FlowTask'
-    },
-    body: JSON.stringify({
-      model: 'mistralai/mistral-7b-instruct',
-      max_tokens: 200,
-      temperature: 0.2,
-      messages: [{ role: 'user', content: prompt }]
-    })
-  });
+import { callAI, parseAIJson, handleCors } from './_ai.js';
 
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`OpenRouter error ${res.status}: ${err}`);
-  }
-
-  const data = await res.json();
-  const text = data.choices?.[0]?.message?.content || '';
-  console.log('[AI] raw response:', text);
-  return text.trim();
-}
-
-// Parse JSON safely from AI output (strips markdown code fences)
-function parseJSON(raw) {
-  const cleaned = raw
-    .replace(/```json/gi, '')
-    .replace(/```/g, '')
-    .trim();
-  // Extract first {...} or [...] block
-  const match = cleaned.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
-  if (!match) throw new Error('No JSON found in: ' + cleaned);
-  return JSON.parse(match[1]);
-}
+const VALID_COLS = ['todo', 'inprogress', 'completed'];
 
 export default async function handler(req, res) {
+  // Handle CORS preflight
+  if (handleCors(req, res)) return;
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { text } = req.body;
-  if (!text || typeof text !== 'string') {
-    return res.status(400).json({ error: 'text is required' });
+  const { text } = req.body || {};
+
+  if (!text || typeof text !== 'string' || !text.trim()) {
+    return res.status(400).json({ error: '"text" field is required' });
   }
 
-  const prompt = `You are a task classifier. Given a task description, return ONLY valid JSON with no explanation.
+  const input = text.trim();
+  console.log('[classify] input:', input);
 
-Task: "${text}"
+  const prompt = `You are a task classifier. Classify the task below and return ONLY valid JSON — no explanation, no markdown.
 
-Rules:
-- "category" must be exactly one of: todo, inprogress, completed
-- Use "completed" if the task is described in past tense (e.g. "finished", "done", "completed")
-- Use "inprogress" if the task is currently happening (e.g. "working on", "coding", "writing")
-- Use "todo" for everything else
-- "title" should be a clean, concise version of the task (max 60 chars)
+Task: "${input}"
 
-Return ONLY this JSON:
-{"title":"<clean title>","category":"<todo|inprogress|completed>"}`;
+Classification rules:
+- "completed" → past tense actions (finished, done, completed, reviewed, shipped, fixed, wrote, built)
+- "inprogress" → currently happening (working on, coding, writing, building, in progress, started)
+- "todo"       → everything else (need to, should, will, plan to, upcoming)
+
+"title" must be a clean, concise rewrite of the task (max 60 characters, no quotes).
+
+Respond with ONLY this JSON object:
+{"title":"<clean task title>","category":"<todo|inprogress|completed>"}`;
 
   try {
-    const raw    = await callAI(prompt);
-    const parsed = parseJSON(raw);
+    const raw    = await callAI(prompt, { max_tokens: 150, temperature: 0.1 });
+    const parsed = parseAIJson(raw);
 
-    // Validate and sanitise
-    const validCols = ['todo', 'inprogress', 'completed'];
-    const category  = validCols.includes(parsed.category) ? parsed.category : 'todo';
-    const title     = typeof parsed.title === 'string' && parsed.title.trim()
+    console.log('[classify] parsed:', parsed);
+
+    const category = VALID_COLS.includes(parsed.category) ? parsed.category : 'todo';
+    const title    = typeof parsed.title === 'string' && parsed.title.trim()
       ? parsed.title.trim().slice(0, 120)
-      : text;
+      : input;
 
+    console.log('[classify] result:', { title, category });
     return res.status(200).json({ title, category });
 
   } catch (err) {
-    console.error('[classify] error:', err.message);
-    // Graceful fallback — never break the UI
-    return res.status(200).json({ title: text, category: 'todo' });
+    console.error('[classify] error — falling back to todo:', err.message);
+    return res.status(200).json({ title: input, category: 'todo' });
   }
 }

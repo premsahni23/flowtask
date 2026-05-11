@@ -1,78 +1,85 @@
 /**
- * /api/assistant
- * Answers questions about the user's tasks using their current board state.
- * Returns: { answer: string }
+ * POST /api/assistant
+ *
+ * Body:    { "question": "What should I do next?", "todo": [], "inprogress": [], "completed": [] }
+ * Returns: { "answer": "Focus on: ..." }
+ *
+ * Falls back to rule-based answers if AI fails.
  */
 
-async function callAI(prompt) {
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://flowtask.vercel.app',
-      'X-Title': 'FlowTask'
-    },
-    body: JSON.stringify({
-      model: 'mistralai/mistral-7b-instruct',
-      max_tokens: 150,
-      temperature: 0.5,
-      messages: [{ role: 'user', content: prompt }]
-    })
-  });
-
-  if (!res.ok) throw new Error(`OpenRouter ${res.status}`);
-  const data = await res.json();
-  return (data.choices?.[0]?.message?.content || '').trim();
-}
+import { callAI, handleCors } from './_ai.js';
 
 export default async function handler(req, res) {
+  if (handleCors(req, res)) return;
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { question, todo = [], inprogress = [], completed = [] } = req.body;
+  const {
+    question,
+    todo      = [],
+    inprogress = [],
+    completed  = []
+  } = req.body || {};
 
-  if (!question) {
-    return res.status(400).json({ error: 'question is required' });
+  if (!question || typeof question !== 'string') {
+    return res.status(400).json({ error: '"question" field is required' });
   }
 
-  const context = `
-Current board state:
-- To Do (${todo.length}): ${todo.slice(0, 5).join(', ') || 'none'}
-- In Progress (${inprogress.length}): ${inprogress.slice(0, 5).join(', ') || 'none'}
-- Completed (${completed.length}): ${completed.slice(0, 5).join(', ') || 'none'}
-`.trim();
+  console.log('[assistant] question:', question);
+  console.log('[assistant] board state — todo:', todo.length, 'inprogress:', inprogress.length, 'completed:', completed.length);
 
-  const prompt = `You are a helpful productivity assistant for a Kanban task manager called FlowTask.
+  // Build a concise board summary for the AI
+  const fmt = (arr) => arr.length === 0 ? 'none' : arr.slice(0, 5).map(t => `"${t}"`).join(', ');
 
+  const context = [
+    `To Do (${todo.length}): ${fmt(todo)}`,
+    `In Progress (${inprogress.length}): ${fmt(inprogress)}`,
+    `Completed (${completed.length}): ${fmt(completed)}`
+  ].join('\n');
+
+  const prompt = `You are a concise productivity assistant for a Kanban app called FlowTask.
+
+Current board:
 ${context}
 
-User question: "${question}"
+User: "${question}"
 
-Answer in 1-2 short sentences. Be direct and actionable. No markdown, no bullet points.`;
+Reply in 1-2 sentences. Be direct and actionable. No markdown, no bullet points, no preamble.`;
 
   try {
-    const answer = await callAI(prompt);
+    const answer = await callAI(prompt, { max_tokens: 120, temperature: 0.5 });
+    console.log('[assistant] answer:', answer);
     return res.status(200).json({ answer });
+
   } catch (err) {
-    console.error('[assistant] error:', err.message);
-    // Fallback answers based on question keywords
+    console.error('[assistant] error — using fallback:', err.message);
+
+    // Rule-based fallback so the UI never shows an error
     const q = question.toLowerCase();
     let answer;
-    if (q.includes('next') || q.includes('do')) {
-      answer = inprogress.length > 0
-        ? `Focus on: "${inprogress[0]}"`
-        : todo.length > 0
-          ? `Start with: "${todo[0]}"`
-          : "You're all caught up! Add a new task.";
-    } else if (q.includes('complet') || q.includes('done') || q.includes('finish')) {
+
+    if (q.includes('next') || q.includes('should i do') || q.includes('start')) {
+      if (inprogress.length > 0) {
+        answer = `Keep working on "${inprogress[0]}" — it's already in progress.`;
+      } else if (todo.length > 0) {
+        answer = `Start with "${todo[0]}" — it's at the top of your list.`;
+      } else {
+        answer = "You're all caught up! Add a new task to keep the momentum going.";
+      }
+    } else if (q.includes('complet') || q.includes('done') || q.includes('finish') || q.includes('today')) {
       answer = completed.length > 0
-        ? `Completed today: ${completed.slice(0, 3).join(', ')}`
+        ? `You've completed ${completed.length} task${completed.length > 1 ? 's' : ''}: ${completed.slice(0, 3).join(', ')}.`
         : "Nothing completed yet — let's change that!";
+    } else if (q.includes('how') || q.includes('progress') || q.includes('doing')) {
+      const total = todo.length + inprogress.length + completed.length;
+      const pct   = total > 0 ? Math.round((completed.length / total) * 100) : 0;
+      answer = `You're ${pct}% done — ${completed.length} completed, ${inprogress.length} in progress, ${todo.length} pending.`;
     } else {
-      answer = `You have ${todo.length} pending and ${inprogress.length} in progress.`;
+      answer = `You have ${todo.length} pending task${todo.length !== 1 ? 's' : ''} and ${inprogress.length} in progress.`;
     }
+
     return res.status(200).json({ answer });
   }
 }
