@@ -126,6 +126,62 @@ FOLLOW-UP QUESTION EXAMPLES (use occasionally, not every reply):
 Respond naturally. Think before answering. Be the assistant the user actually needs right now.`;
 }
 
+// ── Reply sanitizer ───────────────────────────────────────────────────────────
+// Strips any system-prompt phrases that a model might echo back.
+// Applied to EVERY reply before it leaves this function.
+const BLOCKED_PHRASES = [
+  // System prompt identity lines
+  'You are FlowTask AI',
+  'you are flowtask ai',
+  'FlowTask AI —',
+  'FlowTask AI -',
+  'highly intelligent productivity companion',
+  'intelligent, emotionally aware productivity companion',
+  'Think of yourself as a blend of Jarvis',
+  'blend of Jarvis',
+  'supportive coach, and a smart friend',
+  // System prompt section headers
+  'PERSONALITY:',
+  'CURRENT CONTEXT:',
+  'CONVERSATION RULES:',
+  'FOLLOW-UP QUESTION EXAMPLES',
+  'EMOTIONAL_STATE:',
+  // Context primer markers
+  '[Board snapshot for this session]',
+  '[End snapshot',
+  'use this context to answer naturally',
+  // Generic system-prompt tells
+  'system prompt',
+  'You help users',
+  'You have access to',
+  'Never say "As an AI"',
+  'Never use markdown',
+  'Respond naturally. Think before answering',
+];
+
+function sanitizeReply(text) {
+  if (!text) return '';
+  let out = text;
+
+  for (const phrase of BLOCKED_PHRASES) {
+    // Case-insensitive replace of the phrase and any sentence it's part of
+    const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Remove the whole sentence containing the blocked phrase
+    out = out.replace(new RegExp(`[^.!?]*${escaped}[^.!?]*[.!?]?`, 'gi'), '');
+  }
+
+  // Clean up leftover whitespace / double newlines
+  out = out.replace(/\n{3,}/g, '\n\n').trim();
+
+  // If sanitization wiped everything, return a safe fallback
+  if (!out || out.length < 5) {
+    console.warn('[sanitize] reply was fully stripped — using safe fallback');
+    return "I'm here to help. What would you like to work on?";
+  }
+
+  return out;
+}
+
 // ── Safe content extractor ────────────────────────────────────────────────────
 function extractContent(data) {
   let content = data?.choices?.[0]?.message?.content;
@@ -264,14 +320,14 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ reply, answer: reply });
   }
 
-  // Build the full messages array for the API call
-  const systemPrompt  = buildSystemPrompt(todo, inprogress, completed, history, userMessage);
-  const contextPrimer = buildContextPrimer(todo, inprogress, completed);
+  // Build the full messages array for the API call.
+  // Context lives ONLY in the system role — never injected as user turns,
+  // which prevents models from echoing it back as part of their reply.
+  const systemPrompt = buildSystemPrompt(todo, inprogress, completed, history, userMessage);
 
   const messages = [
     { role: 'system', content: systemPrompt },
-    { role: 'user',      content: contextPrimer },
-    { role: 'assistant', content: "Got it — I have your full context and I'm ready." },
+    // Conversation history — only real user/assistant turns, never system content
     ...history.slice(-16).map(h => ({
       role:    h.role === 'assistant' ? 'assistant' : 'user',
       content: String(h.content || '').slice(0, 500)
@@ -280,7 +336,9 @@ module.exports = async function handler(req, res) {
   ];
 
   try {
-    const reply = await callOpenRouter(messages, apiKey, appUrl);
+    const rawReply = await callOpenRouter(messages, apiKey, appUrl);
+    // Sanitize before returning — strip any leaked system prompt phrases
+    const reply = sanitizeReply(rawReply);
     console.log('[assistant] final reply:', reply.slice(0, 120));
     return res.status(200).json({ reply, answer: reply });
   } catch (err) {
@@ -290,20 +348,6 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ reply, answer: reply });
   }
 };
-
-// ── Context primer (injected as user turn for model compatibility) ─────────────
-function buildContextPrimer(todo, inprogress, completed) {
-  const total = todo.length + inprogress.length + completed.length;
-  const pct   = total > 0 ? Math.round((completed.length / total) * 100) : 0;
-  const fmt   = arr => arr.length === 0 ? 'none' : arr.slice(0, 6).join(', ');
-
-  return `[Board snapshot for this session]
-In Progress: ${fmt(inprogress)}
-To Do: ${fmt(todo)}
-Completed: ${fmt(completed)}
-Progress: ${pct}% of ${total} tasks done
-[End snapshot — use this context to answer naturally]`;
-}
 
 // ── Emotionally intelligent fallback ─────────────────────────────────────────
 // Only runs when ALL AI models fail. Varied, empathetic, non-repetitive.

@@ -1988,6 +1988,42 @@
   let voiceOutOn    = false;  // speech synthesis toggle
   let wakeListening = false;  // wake word mode
 
+  /* ── Client-side reply sanitizer ──
+     Mirrors the backend sanitizeReply() as a second line of defence.
+     Applied before rendering, saving to Firestore, and speaking aloud.
+  ── */
+  const SANITIZE_PHRASES = [
+    'You are FlowTask AI',
+    'you are flowtask ai',
+    'FlowTask AI —', 'FlowTask AI -',
+    'highly intelligent productivity companion',
+    'intelligent, emotionally aware productivity companion',
+    'Think of yourself as a blend of Jarvis',
+    'blend of Jarvis',
+    'supportive coach, and a smart friend',
+    'PERSONALITY:', 'CURRENT CONTEXT:', 'CONVERSATION RULES:',
+    'FOLLOW-UP QUESTION EXAMPLES', 'EMOTIONAL_STATE:',
+    '[Board snapshot for this session]', '[End snapshot',
+    'use this context to answer naturally',
+    'system prompt', 'You help users', 'You have access to',
+    'Never say "As an AI"', 'Never use markdown',
+    'Respond naturally. Think before answering',
+  ];
+
+  function sanitizeAIReply(text) {
+    if (!text) return '';
+    let out = text;
+    for (const phrase of SANITIZE_PHRASES) {
+      const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      out = out.replace(new RegExp(`[^.!?\\n]*${escaped}[^.!?\\n]*[.!?]?`, 'gi'), '');
+    }
+    out = out.replace(/\n{3,}/g, '\n\n').trim();
+    if (!out || out.length < 5) {
+      return "I'm here to help. What would you like to work on?";
+    }
+    return out;
+  }
+
   /* ── Render a message bubble into the chat history ── */
   function appendChatBubble(role, text, animate = true) {
     // Hide empty state
@@ -2040,8 +2076,11 @@
       snap.forEach(doc => msgs.unshift(doc.data()));
 
       msgs.forEach(m => {
-        chatLog.push({ role: m.role, content: m.message });
-        appendChatBubble(m.role, m.message, false);
+        // Sanitize historical messages in case any leaked system content was saved previously
+        const safeContent = m.role === 'assistant' ? sanitizeAIReply(m.message) : m.message;
+        if (!safeContent) return; // skip blank entries after sanitization
+        chatLog.push({ role: m.role, content: safeContent });
+        appendChatBubble(m.role, safeContent, false);
       });
     } catch (e) {
       // Index may not exist yet — silently skip
@@ -2158,13 +2197,14 @@
       assistantAskBtn.disabled = false;
     }
 
-    // Add AI response to UI + memory
-    appendChatBubble('ai', answer);
-    chatLog.push({ role: 'assistant', content: answer });
-    saveChatToFirestore('assistant', answer);
+    // Add AI response to UI + memory — sanitize before every use
+    const safeAnswer = sanitizeAIReply(answer);
+    appendChatBubble('ai', safeAnswer);
+    chatLog.push({ role: 'assistant', content: safeAnswer });
+    saveChatToFirestore('assistant', safeAnswer);
 
     // Speak the response if voice output is on
-    speakResponse(answer);
+    speakResponse(safeAnswer);
   }
 
   /* ── Voice output toggle ── */
