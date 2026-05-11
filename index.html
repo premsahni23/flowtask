@@ -2030,7 +2030,7 @@
       const snap = await db.collection('assistant_messages')
         .where('userId', '==', uid)
         .orderBy('timestamp', 'desc')
-        .limit(10)
+        .limit(20)
         .get();
 
       if (snap.empty) return;
@@ -2090,10 +2090,11 @@
     const inprogress = tasks.filter(t => t.col === 'inprogress').map(t => t.text);
     const completed  = tasks.filter(t => t.col === 'completed').map(t => t.text);
 
-    // Send last 10 turns as history (exclude current message — it's in `message`)
-    const history = chatLog.slice(-11, -1);
+    // Send last 20 turns as history for deeper conversational memory
+    const history = chatLog.slice(-21, -1);
 
     let answer;
+    const q_ref = q; // expose to catch block scope
     try {
       const res  = await fetch('/api/assistant', {
         method:  'POST',
@@ -2118,13 +2119,30 @@
       }
     } catch (err) {
       console.warn('[assistant] fetch failed:', err.message);
-      // Client-side fallback — always shows something useful
-      if (inprogress.length > 0) {
-        answer = `Keep going on "${inprogress[0]}" — you've already started it.`;
+      // Client-side fallback — varied, emotionally aware, never robotic
+      const q = q_ref.toLowerCase();
+      if (/overwhelm|stressed|too much/.test(q)) {
+        answer = inprogress.length > 0
+          ? `That's a lot. Just stay with "${inprogress[0]}" for now — everything else can wait.`
+          : "Take a breath. Let's pick just one thing and ignore the rest for now.";
+      } else if (/tired|exhausted|drained/.test(q)) {
+        answer = "Rest is productive too. Even a short break resets your focus more than pushing through.";
+      } else if (inprogress.length > 0) {
+        const opts = [
+          `"${inprogress[0]}" is already in motion — finishing it will feel great.`,
+          `You've got "${inprogress[0]}" active. Give it your full attention and close it out.`,
+          `Your best move right now is finishing "${inprogress[0]}".`
+        ];
+        answer = opts[Math.floor(Math.random() * opts.length)];
       } else if (todo.length > 0) {
-        answer = `Start with "${todo[0]}" — it's first on your list.`;
+        const opts = [
+          `"${todo[0]}" is waiting at the top of your list.`,
+          `How about tackling "${todo[0]}" next?`,
+          `"${todo[0]}" looks like a solid next move.`
+        ];
+        answer = opts[Math.floor(Math.random() * opts.length)];
       } else {
-        answer = "Your board is clear. Add a new task and let's get moving!";
+        answer = "Your board is clear. What would you like to work on next?";
       }
     } finally {
       aiThinking.classList.remove('visible');

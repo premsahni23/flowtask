@@ -1,81 +1,154 @@
 /**
  * POST /api/assistant
  *
- * Conversational AI assistant with:
- * - Full OpenRouter response logging for Vercel debugging
- * - Robust content extraction (handles all response shapes)
- * - System personality injected as first user message (model-compatible)
- * - Conversation history context
- * - Task board awareness
- * - Guaranteed non-empty response — never returns undefined
+ * Human-like conversational AI companion — emotionally intelligent,
+ * context-aware, adaptive, never repetitive.
  *
  * Body:    { message, history, todo, inprogress, completed }
- * Returns: { reply: string }   ← always present, always a non-empty string
+ * Returns: { reply: string, answer: string }  ← both fields always present
  */
 
 'use strict';
 
 const { handleCors, parseBody } = require('./_ai.js');
 
-// ── Models to try in order (first available free model wins) ─────────────────
-// meta-llama/llama-3.1-8b-instruct:free is the most reliable free model on OpenRouter
-// mistralai/mistral-7b-instruct is the fallback
+// ── Model priority list ───────────────────────────────────────────────────────
+// Ordered by conversational quality. First model that returns content wins.
 const MODELS = [
-  'meta-llama/llama-3.1-8b-instruct:free',
-  'mistralai/mistral-7b-instruct:free',
-  'mistralai/mistral-7b-instruct'
+  'meta-llama/llama-3.1-8b-instruct:free',   // best free conversational model
+  'google/gemma-2-9b-it:free',                // strong fallback
+  'mistralai/mistral-7b-instruct:free',       // reliable free fallback
+  'mistralai/mistral-7b-instruct'             // paid fallback (last resort)
 ];
 
+// ── Emotion / intent detector ─────────────────────────────────────────────────
+// Reads the user message and recent history to detect emotional state.
+// Returns a signal string the system prompt uses to adapt its tone.
+function detectEmotionalContext(message, history) {
+  const recent = [message, ...history.slice(-4).map(h => h.content)].join(' ').toLowerCase();
+
+  if (/overwhelm|too much|can't cope|stressed|anxious|panic/.test(recent))
+    return 'EMOTIONAL_STATE: user feels overwhelmed — respond with empathy first, then gently simplify';
+  if (/tired|exhausted|burnt out|burnout|drained|no energy/.test(recent))
+    return 'EMOTIONAL_STATE: user is tired — acknowledge it, suggest rest or a single small win';
+  if (/not productive|unproductive|wasted|procrastinat|distracted|can\'t focus/.test(recent))
+    return 'EMOTIONAL_STATE: user feels unproductive — be encouraging, avoid pressure, suggest one tiny step';
+  if (/happy|great|amazing|crushed it|nailed|proud|excited/.test(recent))
+    return 'EMOTIONAL_STATE: user is in a positive mood — match their energy, celebrate, build momentum';
+  if (/bored|nothing to do|slow day|quiet/.test(recent))
+    return 'EMOTIONAL_STATE: user seems bored — suggest a meaningful task or a stretch goal';
+  if (/stuck|blocked|don\'t know|not sure|confused|help/.test(recent))
+    return 'EMOTIONAL_STATE: user is stuck — ask a clarifying question, break things down';
+
+  return null; // neutral — no special emotional handling needed
+}
+
+// ── Repetition guard ──────────────────────────────────────────────────────────
+// Extracts the first 6 words of recent AI replies so the system prompt
+// can tell the model what phrases to avoid.
+function getRecentAIPhrases(history) {
+  return history
+    .filter(h => h.role === 'assistant')
+    .slice(-4)
+    .map(h => String(h.content || '').split(' ').slice(0, 6).join(' '))
+    .filter(Boolean);
+}
+
+// ── System prompt builder ─────────────────────────────────────────────────────
+function buildSystemPrompt(todo, inprogress, completed, history, userMessage) {
+  const total   = todo.length + inprogress.length + completed.length;
+  const pct     = total > 0 ? Math.round((completed.length / total) * 100) : 0;
+  const now     = new Date();
+  const hour    = now.getHours();
+  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+
+  // Time-of-day context
+  const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : hour < 21 ? 'evening' : 'night';
+
+  const fmt = arr => arr.length === 0 ? 'none' : arr.slice(0, 6).map(t => `"${t}"`).join(', ');
+
+  // Board signals
+  const signals = [];
+  if (total === 0)               signals.push('board is empty — user has no tasks yet');
+  if (todo.length > 7)           signals.push(`heavy backlog: ${todo.length} pending tasks`);
+  if (inprogress.length > 3)     signals.push(`context-switching risk: ${inprogress.length} tasks active simultaneously`);
+  if (pct === 100 && total > 0)  signals.push('all tasks complete — exceptional day');
+  if (pct >= 75 && pct < 100)    signals.push(`strong momentum: ${pct}% done`);
+  if (inprogress.length === 0 && todo.length > 0) signals.push('nothing started yet today');
+  if (completed.length > 0 && inprogress.length === 0 && todo.length === 0)
+    signals.push('all remaining tasks are done');
+
+  // Emotional context
+  const emotion = detectEmotionalContext(userMessage, history);
+
+  // Phrases the AI used recently (to prevent repetition)
+  const recentPhrases = getRecentAIPhrases(history);
+
+  return `You are FlowTask AI — an intelligent, emotionally aware productivity companion. Think of yourself as a blend of Jarvis, a supportive coach, and a smart friend who genuinely cares about the user's wellbeing and output.
+
+PERSONALITY:
+- Warm, natural, and conversational — never robotic or scripted
+- Emotionally intelligent: read the user's mood and adapt your tone accordingly
+- Proactive: notice patterns, ask thoughtful follow-up questions when appropriate
+- Honest: give realistic advice, not just cheerleading
+- Varied: never repeat the same phrasing twice in a row
+- Concise: 1-3 sentences unless the user asks for a plan or breakdown
+
+CURRENT CONTEXT:
+- Time: ${timeStr} on ${dateStr} (${timeOfDay})
+- In Progress (${inprogress.length}): ${fmt(inprogress)}
+- To Do (${todo.length}): ${fmt(todo)}
+- Completed today (${completed.length}): ${fmt(completed)}
+- Overall progress: ${pct}% (${completed.length}/${total} tasks done)
+${signals.length > 0 ? `- Signals: ${signals.join('; ')}` : ''}
+${emotion ? `\n${emotion}` : ''}
+
+CONVERSATION RULES:
+1. Never start a response with "Start with", "Focus on", "Do your first task", or any phrase you used in the last 4 replies
+2. Never say "As an AI", "I'm just an assistant", or "I don't have feelings"
+3. Never use markdown, bullet points, numbered lists, or headers
+4. If the user seems stressed or overwhelmed, acknowledge their feeling BEFORE giving advice
+5. Occasionally ask a thoughtful follow-up question to deepen the conversation — but not every time
+6. If the user has too many tasks, suggest reducing scope rather than just "focusing"
+7. If the board is empty, gently encourage them to add something rather than just stating it's empty
+8. Match the user's energy: if they're excited, be energetic; if they're tired, be calm and gentle
+9. Vary your sentence structure and opening words across responses
+${recentPhrases.length > 0 ? `10. AVOID starting with or repeating these recent phrases: ${recentPhrases.map(p => `"${p}..."`).join(', ')}` : ''}
+
+FOLLOW-UP QUESTION EXAMPLES (use occasionally, not every reply):
+- "What's been blocking you on that?"
+- "Do you want quick wins or deep work right now?"
+- "How are you feeling about your workload today?"
+- "Should we break that into smaller steps?"
+- "What would make today feel like a success for you?"
+
+Respond naturally. Think before answering. Be the assistant the user actually needs right now.`;
+}
+
 // ── Safe content extractor ────────────────────────────────────────────────────
-// Handles every shape OpenRouter might return
 function extractContent(data) {
-  // Standard OpenAI-compatible shape
   let content = data?.choices?.[0]?.message?.content;
 
-  // Some models return content as an array of parts
   if (Array.isArray(content)) {
     content = content.map(p => (typeof p === 'string' ? p : p?.text || '')).join(' ');
   }
 
-  // Ensure it's a string
   content = String(content || '').trim();
 
-  // Strip any accidental markdown the model added
+  // Strip accidental markdown
   content = content
-    .replace(/^#+\s*/gm, '')   // headings
-    .replace(/\*\*(.*?)\*\*/g, '$1')  // bold
-    .replace(/\*(.*?)\*/g, '$1')      // italic
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/^[-*]\s+/gm, '')
+    .replace(/^\d+\.\s+/gm, '')
     .trim();
 
   return content;
 }
 
-// ── Build system context as a user-turn prefix ────────────────────────────────
-// Injected as the first user message so it works with models that ignore system role
-function buildContextPrefix(todo, inprogress, completed) {
-  const total   = todo.length + inprogress.length + completed.length;
-  const pct     = total > 0 ? Math.round((completed.length / total) * 100) : 0;
-  const now     = new Date();
-  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-  const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-  const fmt     = arr => arr.length === 0 ? 'none' : arr.slice(0, 6).join(', ');
-
-  const signals = [];
-  if (todo.length > 6)       signals.push(`overloaded with ${todo.length} pending tasks`);
-  if (inprogress.length > 3) signals.push(`${inprogress.length} tasks in progress simultaneously`);
-  if (pct === 100 && total > 0) signals.push('all tasks complete');
-  if (pct >= 75)             signals.push(`${pct}% done — strong progress`);
-  if (todo.length > 0 && inprogress.length === 0) signals.push('nothing started yet');
-
-  return `[SYSTEM CONTEXT — do not repeat this back to the user]
-You are FlowTask AI, a smart productivity assistant like Jarvis. Be warm, direct, and concise (1-3 sentences). Never use markdown, bullet points, or say "As an AI".
-
-Time: ${timeStr} on ${dateStr}
-Board: In Progress (${inprogress.length}): ${fmt(inprogress)} | To Do (${todo.length}): ${fmt(todo)} | Done (${completed.length}): ${fmt(completed)} | Progress: ${pct}%${signals.length > 0 ? ` | Signals: ${signals.join(', ')}` : ''}
-[END CONTEXT]`;
-}
-
-// ── Call OpenRouter with model fallback ───────────────────────────────────────
+// ── OpenRouter caller with model fallback ─────────────────────────────────────
 async function callOpenRouter(messages, apiKey, appUrl) {
   for (const model of MODELS) {
     console.log('[assistant] trying model:', model);
@@ -92,61 +165,46 @@ async function callOpenRouter(messages, apiKey, appUrl) {
         },
         body: JSON.stringify({
           model,
-          max_tokens:  250,
-          temperature: 0.7,
+          max_tokens:  280,
+          temperature: 0.82,  // higher = more natural, varied responses
+          top_p:       0.92,  // nucleus sampling for diversity
           messages
         })
       });
-    } catch (networkErr) {
-      console.error('[assistant] network error for model', model, ':', networkErr.message);
-      continue; // try next model
+    } catch (netErr) {
+      console.error('[assistant] network error:', model, netErr.message);
+      continue;
     }
 
-    // Log full raw response for Vercel debugging
     const rawText = await httpRes.text();
-    console.log('[assistant] HTTP status:', httpRes.status);
-    console.log('[assistant] raw response:', rawText.slice(0, 800));
+    console.log('[assistant] HTTP', httpRes.status, 'model:', model);
+    console.log('[assistant] raw:', rawText.slice(0, 600));
 
     if (!httpRes.ok) {
-      console.error('[assistant] model', model, 'returned HTTP', httpRes.status, '— trying next');
+      console.error('[assistant] HTTP error — trying next model');
       continue;
     }
 
     let data;
-    try {
-      data = JSON.parse(rawText);
-    } catch (parseErr) {
-      console.error('[assistant] JSON parse failed for model', model, ':', parseErr.message);
-      continue;
-    }
+    try { data = JSON.parse(rawText); }
+    catch (e) { console.error('[assistant] JSON parse failed:', e.message); continue; }
 
-    // Log the full parsed structure
-    console.log('[assistant] parsed data:', JSON.stringify({
-      id:      data?.id,
-      model:   data?.model,
-      choices: data?.choices?.length,
-      usage:   data?.usage,
-      error:   data?.error
-    }));
-
-    // Check for API-level error in body (OpenRouter sometimes returns 200 with error)
     if (data?.error) {
       console.error('[assistant] API error in body:', JSON.stringify(data.error));
       continue;
     }
 
     const content = extractContent(data);
-    console.log('[assistant] extracted content:', content.slice(0, 200));
+    if (data?.usage) console.log('[assistant] tokens:', JSON.stringify(data.usage));
 
     if (content) {
-      console.log('[assistant] success with model:', model);
+      console.log('[assistant] success:', model, '|', content.slice(0, 100));
       return content;
     }
 
-    console.warn('[assistant] empty content from model', model, '— trying next');
+    console.warn('[assistant] empty content from', model);
   }
 
-  // All models failed
   throw new Error('All models returned empty content');
 }
 
@@ -158,110 +216,169 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Parse body — handles both auto-parsed objects and raw streams
   const body = await parseBody(req);
 
-  console.log('[assistant] ── new request ──');
-  console.log('[assistant] raw body keys:', Object.keys(body));
+  console.log('[assistant] ── request ──');
+  console.log('[assistant] body keys:', Object.keys(body));
 
-  // Accept both `message` and `text` field names for compatibility
   const userMessage = (body.message || body.text || '').trim();
-  const history     = Array.isArray(body.history)    ? body.history    : [];
-  const todo        = Array.isArray(body.todo)        ? body.todo        : [];
-  const inprogress  = Array.isArray(body.inprogress)  ? body.inprogress  : [];
-  const completed   = Array.isArray(body.completed)   ? body.completed   : [];
+  const history     = Array.isArray(body.history)   ? body.history   : [];
+  const todo        = Array.isArray(body.todo)       ? body.todo       : [];
+  const inprogress  = Array.isArray(body.inprogress) ? body.inprogress : [];
+  const completed   = Array.isArray(body.completed)  ? body.completed  : [];
 
-  console.log('[assistant] userMessage:', userMessage.slice(0, 120));
-  console.log('[assistant] history turns:', history.length);
-  console.log('[assistant] board — todo:', todo.length, 'inprogress:', inprogress.length, 'completed:', completed.length);
+  console.log('[assistant] message:', userMessage.slice(0, 120));
+  console.log('[assistant] history:', history.length, 'turns | board:', todo.length, 'todo,', inprogress.length, 'active,', completed.length, 'done');
 
   if (!userMessage) {
-    console.error('[assistant] 400 — no message in body:', JSON.stringify(body).slice(0, 200));
+    console.error('[assistant] 400 — empty message. body:', JSON.stringify(body).slice(0, 200));
     return res.status(400).json({ error: 'message is required', received: Object.keys(body) });
   }
 
-  const input  = userMessage;
   const apiKey = process.env.OPENROUTER_API_KEY;
   const appUrl = process.env.APP_URL || 'https://flowtask.vercel.app';
 
   console.log('[assistant] API key set:', !!apiKey);
-  console.log('[assistant] APP_URL:', appUrl);
 
   if (!apiKey) {
-    console.error('[assistant] OPENROUTER_API_KEY is not set — returning fallback');
-    const reply = buildFallback(input, todo, inprogress, completed);
-    return res.status(200).json({ reply, answer: reply }); // both fields for compat
+    console.error('[assistant] OPENROUTER_API_KEY not set');
+    const reply = buildFallback(userMessage, todo, inprogress, completed, history);
+    return res.status(200).json({ reply, answer: reply });
   }
 
-  // Build messages array:
-  // 1. System context injected as first user message (works with all models)
-  // 2. Conversation history (last 10 turns)
-  // 3. Current user message
-  const contextPrefix = buildContextPrefix(todo, inprogress, completed);
+  // Build the full messages array for the API call
+  const systemPrompt   = buildSystemPrompt(todo, inprogress, completed, history, userMessage);
+  const contextPrimer  = buildContextPrimer(todo, inprogress, completed);
 
   const messages = [
-    // System role for models that support it
-    {
-      role:    'system',
-      content: 'You are FlowTask AI, a smart productivity assistant. Be concise, warm, and direct. No markdown.'
-    },
-    // Context as first user message (fallback for models ignoring system role)
-    { role: 'user',      content: contextPrefix },
-    { role: 'assistant', content: 'Understood. I have your task board context and I\'m ready to help.' },
-    // Conversation history
-    ...history.slice(-8).map(h => ({
+    { role: 'system', content: systemPrompt },
+    // Inject board context as a primed exchange so models ignoring system role still get it
+    { role: 'user',      content: contextPrimer },
+    { role: 'assistant', content: 'Got it — I have your full context and I\'m ready.' },
+    // Last 16 turns of conversation history for deep memory
+    ...history.slice(-16).map(h => ({
       role:    h.role === 'assistant' ? 'assistant' : 'user',
-      content: String(h.content || '').slice(0, 400)
+      content: String(h.content || '').slice(0, 500)
     })),
-    // Current message
-    { role: 'user', content: input }
+    { role: 'user', content: userMessage }
   ];
 
   try {
     const reply = await callOpenRouter(messages, apiKey, appUrl);
-    // Return both `reply` and `answer` so both old and new frontend code works
     return res.status(200).json({ reply, answer: reply });
-
   } catch (err) {
     console.error('[assistant] all models failed:', err.message);
-    const reply = buildFallback(input, todo, inprogress, completed);
+    const reply = buildFallback(userMessage, todo, inprogress, completed, history);
     return res.status(200).json({ reply, answer: reply });
   }
 };
 
-// ── Rule-based fallback ───────────────────────────────────────────────────────
-function buildFallback(message, todo, inprogress, completed) {
+// ── Context primer (injected as user turn for model compatibility) ─────────────
+function buildContextPrimer(todo, inprogress, completed) {
+  const total = todo.length + inprogress.length + completed.length;
+  const pct   = total > 0 ? Math.round((completed.length / total) * 100) : 0;
+  const fmt   = arr => arr.length === 0 ? 'none' : arr.slice(0, 6).join(', ');
+
+  return `[Board snapshot for this session]
+In Progress: ${fmt(inprogress)}
+To Do: ${fmt(todo)}
+Completed: ${fmt(completed)}
+Progress: ${pct}% of ${total} tasks done
+[End snapshot — use this context to answer naturally]`;
+}
+
+// ── Emotionally intelligent fallback ─────────────────────────────────────────
+// Only runs when ALL AI models fail. Varied, empathetic, non-repetitive.
+function buildFallback(message, todo, inprogress, completed, history = []) {
   const q     = message.toLowerCase();
   const total = todo.length + inprogress.length + completed.length;
   const pct   = total > 0 ? Math.round((completed.length / total) * 100) : 0;
 
-  if (q.includes('next') || q.includes('should i') || q.includes('start') || q.includes('what') || q.includes('do')) {
-    if (inprogress.length > 0) return `Keep going on "${inprogress[0]}" — you've already started it.`;
-    if (todo.length > 0)       return `Start with "${todo[0]}" — it's first on your list.`;
-    return "Your board is clear! Add a new task and let's get moving.";
+  // Detect emotional state
+  const isOverwhelmed = /overwhelm|stressed|too much|anxious|panic/.test(q);
+  const isTired       = /tired|exhausted|burnt|drained|no energy/.test(q);
+  const isStuck       = /stuck|blocked|don't know|not sure|confused/.test(q);
+  const isPositive    = /great|amazing|crushed|nailed|proud|excited/.test(q);
+
+  // Emotional responses first
+  if (isOverwhelmed) {
+    if (inprogress.length > 0)
+      return `That's a lot to carry. Let's simplify — just stay with "${inprogress[0]}" for now and ignore everything else.`;
+    if (todo.length > 0)
+      return `I hear you. Pick just one thing from your list — "${todo[0]}" — and let everything else wait.`;
+    return "Take a breath. Your board is actually clear — sometimes the overwhelm is in our heads. What's really on your mind?";
   }
+
+  if (isTired) {
+    if (completed.length > 0)
+      return `You've already done ${completed.length} thing${completed.length > 1 ? 's' : ''} today — that's real. Rest is productive too. What would feel manageable right now?`;
+    return "Rest is part of the process. Even a 10-minute break can reset your focus. What's one small thing you could do after?";
+  }
+
+  if (isStuck) {
+    if (inprogress.length > 0)
+      return `What specifically is blocking you on "${inprogress[0]}"? Sometimes naming it is half the solution.`;
+    return "What's the smallest possible next step you could take? Even something tiny counts.";
+  }
+
+  if (isPositive) {
+    if (pct === 100 && total > 0)
+      return "You cleared everything — that's genuinely impressive. What's next on your radar?";
+    return `Love the energy! You're at ${pct}% — keep that momentum going.`;
+  }
+
+  // Task-state responses — varied phrasing pool
+  const nextTaskResponses = inprogress.length > 0
+    ? [
+        `You've got "${inprogress[0]}" in motion — that's your best bet right now.`,
+        `"${inprogress[0]}" is already rolling. Finishing it will feel great.`,
+        `Your active task is "${inprogress[0]}" — give it your full attention and close it out.`
+      ]
+    : todo.length > 0
+      ? [
+          `"${todo[0]}" is waiting at the top of your list — a good place to begin.`,
+          `How about tackling "${todo[0]}" next? It's been sitting there.`,
+          `"${todo[0]}" looks like a solid next move. What do you think?`
+        ]
+      : [
+          "Your board is clear — a rare and good thing. What would you like to add?",
+          "Nothing left on the board. Time to plan your next move.",
+          "All clear! What's coming up next for you?"
+        ];
+
+  if (q.includes('next') || q.includes('should') || q.includes('what') || q.includes('do') || q.includes('start')) {
+    return nextTaskResponses[Math.floor(Math.random() * nextTaskResponses.length)];
+  }
+
   if (q.includes('complet') || q.includes('done') || q.includes('finish') || q.includes('today')) {
-    if (completed.length === 0) return "Nothing completed yet — pick one task and start it now.";
-    return `You've completed ${completed.length} task${completed.length > 1 ? 's' : ''} today: ${completed.slice(0, 3).join(', ')}.`;
+    if (completed.length === 0) return "Nothing marked complete yet today — but the day isn't over. What can you close out?";
+    if (pct === 100)            return `Everything done — ${completed.length} task${completed.length > 1 ? 's' : ''} completed. That's a full day.`;
+    return `${completed.length} task${completed.length > 1 ? 's' : ''} done so far: ${completed.slice(0, 3).join(', ')}. ${todo.length > 0 ? `${todo.length} more to go.` : 'Almost there!'}`;
   }
+
   if (q.includes('how') || q.includes('progress') || q.includes('doing') || q.includes('status')) {
-    if (pct === 100 && total > 0) return "Everything done — you absolutely crushed it today!";
-    return `You're ${pct}% done — ${completed.length} completed, ${inprogress.length} in progress, ${todo.length} still to do.`;
+    if (pct === 100 && total > 0) return "Everything's done — you had a great day.";
+    if (pct === 0 && total > 0)   return `${total} tasks on the board, none started yet. What's the first move?`;
+    return `You're ${pct}% through — ${completed.length} done, ${inprogress.length} active, ${todo.length} waiting. Solid progress.`;
   }
-  if (q.includes('overwhelm') || q.includes('too many') || q.includes('stress') || q.includes('focus')) {
-    const target = inprogress[0] || todo[0];
-    return target
-      ? `Focus on just one thing: "${target}". Close everything else and get it done.`
-      : "Take a breath. Your board is clear — add one task and start fresh.";
+
+  if (q.includes('break') || q.includes('rest')) {
+    return "Absolutely — step away for a bit. Your tasks will still be here. A clear head is worth more than pushing through tired.";
   }
-  if (q.includes('break') || q.includes('rest') || q.includes('tired')) {
-    return "Take a 10-minute break — you've earned it. Come back fresh and tackle the next task.";
-  }
+
   if (q.includes('priorit') || q.includes('important') || q.includes('urgent')) {
-    if (inprogress.length > 0) return `Finish "${inprogress[0]}" first — completing beats starting.`;
-    if (todo.length > 0)       return `"${todo[0]}" is your top priority. Start there.`;
-    return "Board is clear — great time to plan your next goals.";
+    if (inprogress.length > 0) return `Finishing "${inprogress[0]}" is your highest-value move right now — completing beats starting.`;
+    if (todo.length > 0)       return `"${todo[0]}" is at the top of your list. That's usually a good signal for priority.`;
+    return "Board is clear — great moment to think about what matters most next.";
   }
-  if (total === 0) return "Your board is empty. Add your first task and let's get moving!";
-  return `You have ${todo.length} pending, ${inprogress.length} in progress, and ${completed.length} completed. What would you like to focus on?`;
+
+  // Generic — varied
+  if (total === 0) return "Your board is empty. What's on your mind today?";
+
+  const generic = [
+    `You have ${todo.length} pending and ${inprogress.length} in progress. What would you like to dig into?`,
+    `${total} tasks total, ${pct}% done. What's on your mind?`,
+    `Looking at your board — ${inprogress.length > 0 ? `"${inprogress[0]}" is active` : `${todo.length} tasks waiting`}. How can I help?`
+  ];
+  return generic[Math.floor(Math.random() * generic.length)];
 }
